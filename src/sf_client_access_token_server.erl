@@ -20,9 +20,9 @@
 
 %% API
 -export([
-     start_link/1
-    ,get_server_access_token/1
-    ,reasign_server_access_token/1
+     start_link/0
+    ,get_server_access_token/0
+    ,reasign_server_access_token/0
 ]).
 
 %% gen_fsm callbacks
@@ -43,7 +43,6 @@
     access_token                  :: access_token(),
     access_token_expiry_tref      :: timer:tref(),
     get_server_access_token_queue :: get_server_access_token_queue(),
-    server_app_env_name           :: atom(),
     max_reconnect_attempts        = ?MAX_RECONNECT_ATTEMPTS :: non_neg_integer(),
     attempt_error_msg             :: term()
 }).
@@ -55,12 +54,11 @@
 %%%===================================================================
 
 
--spec get_server_access_token(ServerAppEnvName) -> {ok, Result} | {error, Reason} when
-    ServerAppEnvName :: atom(),
+-spec get_server_access_token() -> {ok, Result} | {error, Reason} when
     Result           :: access_token(),
     Reason           :: term().
-get_server_access_token(ServerAppEnvName) ->
-    case catch gen_fsm:sync_send_event(ServerAppEnvName, get_server_access_token,
+get_server_access_token() ->
+    case catch gen_fsm:sync_send_event(?MODULE, get_server_access_token,
              sf_client_config:get_access_token_server_request_retry_timeout() * (?MAX_RECONNECT_ATTEMPTS + 1) * 1000) of
         {'EXIT', {timeout, _}} ->
             {error, 'timeout_while_trying_to_communicate_with_auth_server'};
@@ -69,12 +67,11 @@ get_server_access_token(ServerAppEnvName) ->
     end.
 
 
--spec reasign_server_access_token(ServerAppEnvName) -> {ok, Result} | {error, Reason} when
-    ServerAppEnvName :: atom(),
+-spec reasign_server_access_token() -> {ok, Result} | {error, Reason} when
     Result           :: access_token(),
     Reason           :: term().
-reasign_server_access_token(ServerAppEnvName) ->
-    case catch gen_fsm:sync_send_all_state_event(ServerAppEnvName, reasign_server_access_token,
+reasign_server_access_token() ->
+    case catch gen_fsm:sync_send_all_state_event(?MODULE, reasign_server_access_token,
              sf_client_config:get_access_token_server_request_retry_timeout() * (?MAX_RECONNECT_ATTEMPTS + 1) * 1000) of
         {'EXIT', {timeout, _}} ->
             {error, 'timeout_while_trying_to_communicate_with_auth_server'};
@@ -91,9 +88,9 @@ reasign_server_access_token(ServerAppEnvName) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(ServerAppEnvName :: atom()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
-start_link(ServerAppEnvName) ->
-    gen_fsm:start_link({local, ServerAppEnvName}, ?MODULE, [ServerAppEnvName], []).
+-spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
+start_link() ->
+    gen_fsm:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -109,12 +106,11 @@ start_link(ServerAppEnvName) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([ServerAppEnvName]) ->
+init([]) ->
     process_flag(trap_exit, true),
     {ok, access_token_unassigned, #state{
-        get_server_access_token_queue = queue:new(),
-        server_app_env_name = ServerAppEnvName}
-    }.
+        get_server_access_token_queue = queue:new()
+    }}.
 
 
 %%--------------------------------------------------------------------

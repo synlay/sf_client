@@ -10,6 +10,11 @@
 
 -behaviour(supervisor).
 
+%% Helper macro for declaring children of supervisor
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(CHILD(I, ARGS, Type), {I, {I, start_link, [ARGS]}, permanent, 5000, Type, [I]}).
+-define(CHILD_WITH_FUNC(I, F, ARGS, Type), {I, {I, F, [ARGS]}, permanent, 5000, Type, [I]}).
+
 %% API
 -export([start_link/0]).
 
@@ -31,7 +36,15 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+    RestartStrategy = one_for_one,
+    MaxRestarts = 1000,
+    MaxSecondsBetweenRestarts = 3600,
+
+    SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
+
+    {ok, {SupFlags, [
+        ?CHILD(sf_client_access_token_server, worker)
+    ]}}.
 
 %%====================================================================
 %% Internal functions

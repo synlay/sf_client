@@ -26,7 +26,7 @@
 ]).
 
 init() ->
-    ok = stillir:set_config(?APP_ENV, [
+    stillir:set_config(?APP_ENV, [
          {sf_rest_api_version, "SF_REST_API_VERSION", [{transform, binary}, {default, fun() ->
               list_to_binary(get_config(sf_rest_api_version))
           end}]}
