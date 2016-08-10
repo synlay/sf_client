@@ -1,0 +1,27 @@
+{application, sf_client, [
+    {description, "An OTP application"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {sf_client_app, []}},
+    {applications, [
+         kernel
+        ,stdlib
+        ,lager
+        ,restc
+    ]},
+    {env,[]},
+    {modules, []},
+
+    {maintainers, [
+        "David Robakowski"
+    ]},
+    {licenses, [
+        "MIT License"
+    ]},
+    {links, [
+        {"GitHub", "https://github.com/synlay/sf_client"}
+    ]},
+    {build_tools, [
+        <<"rebar3">>
+    ]}
+]}.
