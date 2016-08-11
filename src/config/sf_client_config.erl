@@ -23,6 +23,7 @@
     ,get_credentials_password/0
     ,get_access_token_expiry/0
     ,get_access_token_server_request_retry_timeout/0
+    ,get_sobjects_mapping/0
 ]).
 
 init() ->
@@ -31,12 +32,13 @@ init() ->
               list_to_binary(get_config(sf_rest_api_version))
           end}]}
         ,{sf_rest_api_endpoint, "SF_REST_API_ENDPOINT", [{transform, fun(_) ->
-              "https://" ++ get_config(sf_rest_api_endpoint)
+              list_to_binary("https://" ++ get_config(sf_rest_api_endpoint))
           end}, {default, fun() ->
-              "https://" ++ get_config(sf_rest_api_endpoint)
+              list_to_binary("https://" ++ get_config(sf_rest_api_endpoint))
           end}]}
         ,{sf_rest_api_version_path, "SF_REST_API_VERSION_PATH", [{default, fun() ->
-              case restc:request(get, json, get_sf_rest_api_endpoint() ++ "/services/data/", [200]) of
+              RestApiEndpoint = get_sf_rest_api_endpoint(),
+              case restc:request(get, json, <<RestApiEndpoint/binary, "/services/data/">>, [200]) of
                   {ok, 200, _Header, Body} ->
                       VersionPath = find_iterator(get_sf_rest_api_version(), Body),
                       lager:debug("Found a SalesForce REST API version path: ~s", [VersionPath]),
@@ -89,6 +91,9 @@ get_access_token_expiry() ->
 
 get_access_token_server_request_retry_timeout() ->
     get_config(access_token_server_request_retry_timeout).
+
+get_sobjects_mapping() ->
+    get_config(sobjects_mapping).
 
 %%====================================================================
 %% Internal functions

@@ -1,4 +1,8 @@
-[{<<"erlsom">>,
+[{<<"erlando">>,
+  {git,"https://github.com/rabbitmq/erlando.git",
+       {ref,"1c1ef25a9bc228671b32b4a6ee30c7525314b1fd"}},
+  0},
+ {<<"erlsom">>,
   {git,"https://github.com/willemdj/erlsom",
        {ref,"9b3f9106a9b1376ab7a4dbdd11cae7bb9835ef0a"}},
   1},
@@ -22,4 +26,8 @@
        {ref,"81ab27b08f95fcab6a126f66b3c1967a5dd0cfb1"}},
   0},
  {<<"ssl_verify_hostname">>,{pkg,<<"ssl_verify_hostname">>,<<"1.0.5">>},2},
+ {<<"st_commons">>,
+  {git,"https://github.com/synlay/st_commons.git",
+       {ref,"ea0fc9116b9524ab68d16e8e19a29e1beee19809"}},
+  0},
  {<<"stillir">>,{pkg,<<"stillir">>,<<"1.0.0">>},0}].

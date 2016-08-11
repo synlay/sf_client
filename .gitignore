@@ -16,3 +16,4 @@ _rel
 relx
 _build
 TEST-*.xml
+*.crashdump

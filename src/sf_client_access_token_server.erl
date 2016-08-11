@@ -299,7 +299,7 @@ notify_all_caller(Queue, Reply) ->
 
 init_system() ->
     ExpiryDelta = 500,
-    Url = restc:construct_url(sf_client_config:get_sf_rest_api_endpoint(), "/services/oauth2/token", [
+    Url = restc:construct_url(binary_to_list(sf_client_config:get_sf_rest_api_endpoint()), "/services/oauth2/token", [
         {"grant_type", "password"},
         {"client_id", sf_client_config:get_credentials_client_id()},
         {"client_secret", sf_client_config:get_credentials_client_secret()},
@@ -308,7 +308,7 @@ init_system() ->
     ]),
     case restc:request(post, json, Url, [200]) of
         {ok, 200, _Header, Body} ->
-            lager:debug("Got access token from SalesForce: ~p", [Body]),
+            lager:debug("Got new access token from SalesForce"),
             {ok, proplists:get_value(<<"access_token">>, Body),
                  (sf_client_config:get_access_token_expiry() - ExpiryDelta) * 1000};
         {error, _ErrorCode, _Header, Body} ->

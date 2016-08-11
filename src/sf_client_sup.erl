@@ -10,11 +10,6 @@
 
 -behaviour(supervisor).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
--define(CHILD(I, ARGS, Type), {I, {I, start_link, [ARGS]}, permanent, 5000, Type, [I]}).
--define(CHILD_WITH_FUNC(I, F, ARGS, Type), {I, {I, F, [ARGS]}, permanent, 5000, Type, [I]}).
-
 %% API
 -export([start_link/0]).
 
@@ -43,7 +38,10 @@ init([]) ->
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
     {ok, {SupFlags, [
-        ?CHILD(sf_client_access_token_server, worker)
+         st_supervisor_lib:new_convenient_child_spec(sf_client_access_token_server,
+                                                     sf_client_access_token_server, [], permanent, 5000, worker)
+        ,st_supervisor_lib:new_convenient_child_spec(sf_client_sobjects_mapping_server,
+                                                     sf_client_sobjects_mapping_server, [], permanent, 5000, worker)
     ]}}.
 
 %%====================================================================
