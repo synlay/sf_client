@@ -20,3 +20,5 @@
 -callback new_sobject_from_model(Model :: any()) -> DbSObject :: db_sobject().
 
 -callback sobject_table_name() -> sobject_table_name().
+
+-callback to_string(Model :: any()) -> string().
