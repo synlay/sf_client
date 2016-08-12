@@ -76,7 +76,7 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     ets:new(?MODULE, [public, named_table, {read_concurrency, true}]),
-    _ = init_sf_mappings(5),
+    _ = init_sf_mappings(),
     {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -143,12 +143,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-undefined_lift(undefined, Monad, Message) -> Monad:fail(Message);
-
-undefined_lift(Value, Monad, _Message) -> Monad:return(Value).
-
-
-init_sf_mappings(Retries) when Retries > 0 ->
+init_sf_mappings() ->
 
     SObjectsMapping = maps:fold(fun(Module, ModelIdentifier, Acc) ->
         SObjectTableName = Module:sobject_table_name(),
@@ -158,47 +153,38 @@ init_sf_mappings(Retries) when Retries > 0 ->
     ApiEndpoint = sf_client_config:get_sf_rest_api_endpoint(),
     ApiVersionPath = sf_client_config:get_sf_rest_api_version_path(),
 
-    {ok, AccessToken} = sf_client_access_token_server:get_server_access_token(),
-    Url = restc:construct_url(binary_to_list(<<ApiEndpoint/binary,  ApiVersionPath/binary>>), "/sobjects", []),
+    Url = restc:construct_url(binary_to_list(ApiEndpoint), binary_to_list(ApiVersionPath), []),
 
-    case restc:request(get, json, Url, [200], [{<<"Authorization">>, <<"Bearer ", AccessToken/binary>>}]) of
-        {ok, 200, _Header, Body} ->
-            {ok, ProcessedSObjectsMapping} = lists:foldl(fun(SObject, {ok, Acc}) ->
-                ?maybe_get_default(do([error_m ||
-                    Name <- undefined_lift(st_traverse_utils:traverse_by_path(<<"name">>, SObject), error_m,
-                                           no_name_attribute_found),
-                    monad_plus:guard(error_m, maps:is_key(Name, Acc)),
-                    PathValue = st_traverse_utils:traverse_by_path(<<"urls.sobject">>, SObject),
-                    _ = lager:debug("Found mapping URL: '~ts' for sobject: '~ts'", [PathValue, Name]),
+    do([error_m ||
+        Response <- sf_client_lib:request(get, 200, Url),
+        SObjectsPath <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"sobjects">>, Response),
+                                                     error_m, no_name_attribute_found),
+        SObjectsUrl = restc:construct_url(binary_to_list(ApiEndpoint), binary_to_list(SObjectsPath), []),
+        SObjectsResponse <- sf_client_lib:request(get, 200, SObjectsUrl),
+        SObjects <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"sobjects">>, SObjectsResponse),
+                                                 error_m, no_sobjects_attribute_found),
+        ProcessedSObjectsMapping <- lists:foldl(fun(SObject, {ok, Acc}) ->
+            ?maybe_get_default(do([error_m ||
+                Name <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"name">>, SObject), error_m,
+                                                     no_name_attribute_found),
+                monad_plus:guard(error_m, maps:is_key(Name, Acc)),
+                PathValue = st_traverse_utils:traverse_by_path(<<"urls.sobject">>, SObject),
+                _ = lager:debug("Found mapping URL: '~ts' for sobject: '~ts'", [PathValue, Name]),
 
-                    lists:foreach(fun({Module, ModelIdentifier}) ->
-                        ets:insert(?MODULE, {ModelIdentifier,
-                                             sf_client_sobjects_mapping:new(Module,
-                                                                            <<ApiEndpoint/binary, PathValue/binary>>)})
-                    end, maps:get(Name, Acc)),
-                    return(maps:remove(Name, Acc))
-                ]), {error, _}, {ok, Acc})
-            end, {ok, SObjectsMapping}, st_traverse_utils:traverse_by_path(<<"sobjects">>, Body)),
+                lists:foreach(fun({Module, ModelIdentifier}) ->
+                    ets:insert(?MODULE, {ModelIdentifier,
+                                         sf_client_sobjects_mapping:new(Module,
+                                                                        <<ApiEndpoint/binary, PathValue/binary>>)})
+                end, maps:get(Name, Acc)),
+                return(maps:remove(Name, Acc))
+            ]), {error, _}, {ok, Acc})
+        end, {ok, SObjectsMapping}, SObjects),
 
-            UnprocessedSObjectsCount = maps:size(ProcessedSObjectsMapping),
-            if
-                UnprocessedSObjectsCount > 0 ->
-                    lager:warning("For some mappings were no corresponding sobjects found: ~p",
-                                  [ProcessedSObjectsMapping]);
-                true ->
-                    ok
-            end;
-        {error, 401, _Header, _Body} ->
-            Timeout = st_math_lib:ceiling(2000 * rand:uniform() + 1000),
-            lager:debug("Token seems to be unauthorized or expired, retrying the request after: ~p ms; "
-                        "Left retries: ~p", [Timeout, Retries]),
-            timer:sleep(Timeout),
-            init_sf_mappings(Retries - 1);
-        {error, _ErrorCode, _Header, Body} ->
-            lager:error("Could not authorize client credentials; Reason: ~p", [Body]),
-            {error, Body}
-    end;
-
-init_sf_mappings(_) ->
-    lager:error("SalesForce model mapping initialization process failed: Maximal retries reached"),
-    {error, max_retries}.
+        UnprocessedSObjectsCount = maps:size(ProcessedSObjectsMapping),
+        if
+            UnprocessedSObjectsCount > 0 ->
+                lager:warning("For some mappings were no corresponding sobjects found: ~p", [ProcessedSObjectsMapping]);
+            true ->
+                ok
+        end
+    ]).

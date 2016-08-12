@@ -306,12 +306,12 @@ init_system() ->
         {"username", sf_client_config:get_credentials_username()},
         {"password", sf_client_config:get_credentials_password()}
     ]),
-    case restc:request(post, json, Url, [200]) of
-        {ok, 200, _Header, Body} ->
+    case sf_client_lib:request([], post, 200, Url, false) of
+        {ok, Body} ->
             lager:debug("Got new access token from SalesForce"),
-            {ok, proplists:get_value(<<"access_token">>, Body),
+            {ok, st_traverse_utils:traverse_by_path(<<"access_token">>, Body),
                  (sf_client_config:get_access_token_expiry() - ExpiryDelta) * 1000};
-        {error, _ErrorCode, _Header, Body} ->
-            lager:error("Could not authorize client credentials; Reason: ~p", [Body]),
-            {error, Body}
+        {error, Reason}=Err ->
+            lager:error("Could not authorize client credentials; Reason: ~p", [Reason]),
+            Err
     end.
