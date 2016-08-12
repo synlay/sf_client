@@ -16,15 +16,20 @@
 -include_lib("st_commons/include/st_commons.hrl").
 
 %% API
--export([start_link/0]).
+-export([
+     start_link/0
+    ,get_sobjects_mapping/1
+]).
 
 %% gen_server callbacks
--export([init/1,
-  handle_call/3,
-  handle_cast/2,
-  handle_info/2,
-  terminate/2,
-  code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -define(SERVER, ?MODULE).
 
@@ -33,6 +38,15 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+
+get_sobjects_mapping(MappingKey) ->
+    case ets:lookup(?MODULE, MappingKey) of
+        [] ->
+            error_m:fail(mapping_not_found);
+        [{MappingKey, Value}] ->
+            error_m:return(Value)
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -136,7 +150,10 @@ undefined_lift(Value, Monad, _Message) -> Monad:return(Value).
 
 init_sf_mappings(Retries) when Retries > 0 ->
 
-    SObjectsMapping = sf_client_config:get_sobjects_mapping(),
+    SObjectsMapping = maps:fold(fun(Module, ModelIdentifier, Acc) ->
+        SObjectTableName = Module:sobject_table_name(),
+        Acc#{SObjectTableName => [{Module, ModelIdentifier} | maps:get(SObjectTableName, Acc, [])]}
+    end, #{}, sf_client_config:get_sobjects_mapping()),
 
     ApiEndpoint = sf_client_config:get_sf_rest_api_endpoint(),
     ApiVersionPath = sf_client_config:get_sf_rest_api_version_path(),
@@ -146,23 +163,28 @@ init_sf_mappings(Retries) when Retries > 0 ->
 
     case restc:request(get, json, Url, [200], [{<<"Authorization">>, <<"Bearer ", AccessToken/binary>>}]) of
         {ok, 200, _Header, Body} ->
-            {ok, ProcessedSObjectsMappingSet} = lists:foldl(fun(SObject, {ok, Acc}) ->
+            {ok, ProcessedSObjectsMapping} = lists:foldl(fun(SObject, {ok, Acc}) ->
                 ?maybe_get_default(do([error_m ||
                     Name <- undefined_lift(st_traverse_utils:traverse_by_path(<<"name">>, SObject), error_m,
                                            no_name_attribute_found),
-                    monad_plus:guard(error_m, sets:is_element(Name, Acc)),
+                    monad_plus:guard(error_m, maps:is_key(Name, Acc)),
                     PathValue = st_traverse_utils:traverse_by_path(<<"urls.sobject">>, SObject),
                     _ = lager:debug("Found mapping URL: '~ts' for sobject: '~ts'", [PathValue, Name]),
-                    _ = ets:insert(?MODULE, {Name, PathValue}),
-                    return(sets:del_element(Name, Acc))
-                ]), {error, _}, {ok, Acc})
-            end, {ok, sets:from_list(maps:keys(SObjectsMapping))}, proplists:get_value(<<"sobjects">>, Body)),
 
-            UnprocessedSObjectsCount = sets:size(ProcessedSObjectsMappingSet),
+                    lists:foreach(fun({Module, ModelIdentifier}) ->
+                        ets:insert(?MODULE, {ModelIdentifier,
+                                             sf_client_sobjects_mapping:new(Module,
+                                                                            <<ApiEndpoint/binary, PathValue/binary>>)})
+                    end, maps:get(Name, Acc)),
+                    return(maps:remove(Name, Acc))
+                ]), {error, _}, {ok, Acc})
+            end, {ok, SObjectsMapping}, st_traverse_utils:traverse_by_path(<<"sobjects">>, Body)),
+
+            UnprocessedSObjectsCount = maps:size(ProcessedSObjectsMapping),
             if
                 UnprocessedSObjectsCount > 0 ->
                     lager:warning("For some mappings were no corresponding sobjects found: ~p",
-                        [sets:to_list(ProcessedSObjectsMappingSet)]);
+                                  [ProcessedSObjectsMapping]);
                 true ->
                     ok
             end;
