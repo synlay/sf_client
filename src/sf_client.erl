@@ -16,6 +16,7 @@
      create/2
     ,update/3
     ,delete/2
+    ,get_sobject_id_by_model/2
 ]).
 
 
@@ -43,16 +44,45 @@ update(MappingKey, SObjectId, Model) ->
 
 delete(MappingKey, SObjectId) ->
     do([error_m ||
-        SObjectMapping <- sf_client_sobjects_mapping_server:get_sobjects_mapping(MappingKey),
-        MappingUrl = sf_client_sobjects_mapping:'#get-model'(mapping_url, SObjectMapping),
+        {_MappingModule, MappingUrl} <- get_model_mapping_config(MappingKey),
         SObjectUrl = restc:construct_url(binary_to_list(MappingUrl), binary_to_list(SObjectId), []),
         _ <- sf_client_lib:request(delete, 204, SObjectUrl),
         lager:notice("Successfully deleted sobject with ID: '~ts'", [SObjectId])
     ]).
 
+
+get_sobject_id_by_model(MappingKey, Model) ->
+    do([error_m ||
+        {ModelId, SObject} <- find_sobject_by_model(MappingKey, Model, [{"fields", "Id"}]),
+        Id <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"Id">>, SObject), error_m,
+                                           no_id_attribute_found),
+        lager:debug("Successfully found sobject with id: '~ts' for model id: '~ts'", [Id, ModelId]),
+        return(Id)
+    ]).
+
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+
+find_sobject_by_model(MappingKey, Model, Fields) ->
+    do([error_m ||
+        {MappingModule, MappingUrl} <- get_model_mapping_config(MappingKey),
+        ExternalIdAttributeName = case catch MappingModule:sobject_external_id_attribute_name() of
+            undefined ->
+                <<"ExternalId">>;
+            {'EXIT', _} ->
+                <<"ExternalId">>;
+            AttributeName ->
+                AttributeName
+        end,
+        ModelId = MappingModule:model_id(Model),
+        Url = restc:construct_url(binary_to_list(MappingUrl),
+                                  binary_to_list(<<ExternalIdAttributeName/binary, "/", ModelId/binary>>), Fields),
+        Response <- sf_client_lib:request(get, 200, Url),
+        return({ModelId, Response})
+    ]).
+
 
 get_model_mapping_config(MappingKey) ->
     do([error_m ||

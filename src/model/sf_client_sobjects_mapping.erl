@@ -18,8 +18,8 @@
 -type mapping_url() :: binary().
 
 -record(model, {
-     mapping_module :: mapping_module()
-    ,mapping_url :: mapping_url()
+     mapping_module :: mapping_module() | undefined
+    ,mapping_url    :: mapping_url() | undefined
 }).
 
 -type model() :: #model{}.
