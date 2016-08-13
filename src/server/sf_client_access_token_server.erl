@@ -40,8 +40,9 @@
 ]).
 
 -record(state, {
-    access_token                  :: access_token(),
-    access_token_expiry_tref      :: timer:tref(),
+    access_token                  :: access_token() | undefined,
+    access_toke_assigned_at       :: integer() | undefined,
+    access_token_expiry_tref      :: timer:tref() | undefined,
     get_server_access_token_queue :: get_server_access_token_queue(),
     max_reconnect_attempts        = ?MAX_RECONNECT_ATTEMPTS :: non_neg_integer(),
     attempt_error_msg             :: term()
@@ -131,6 +132,7 @@ init([]) ->
             NextStateHandlerFun = fun(TRef) ->
                 {next_state, ?ACCESS_TOKEN_ASSIGNED, State#state{
                     access_token = AccessToken,
+                    access_toke_assigned_at = erlang:monotonic_time(),
                     access_token_expiry_tref = TRef,
                     get_server_access_token_queue = NewCallerQueue,
                     max_reconnect_attempts = ?MAX_RECONNECT_ATTEMPTS
@@ -220,14 +222,29 @@ handle_event(_Event, StateName, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(reasign_server_access_token, From, _StateName, State) ->
-    {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
-        get_server_access_token_queue = queue:cons(From, State#state.get_server_access_token_queue),
-        access_token = undefined,
-        access_token_expiry_tref = cancel_timer(State),
-        max_reconnect_attempts = ?MAX_RECONNECT_ATTEMPTS
-    }, 0};
-
+handle_sync_event(reasign_server_access_token, From, StateName, State) ->
+    ReasignToken =
+    if
+        State#state.access_toke_assigned_at /= undefined ->
+            SecSinceTokenCreation = erlang:convert_time_unit(abs(State#state.access_toke_assigned_at -
+                                                                 erlang:monotonic_time()),
+                                                             native, seconds),
+            SecSinceTokenCreation > 30;
+        true ->
+            true
+    end,
+    if
+        StateName == ?ACCESS_TOKEN_ASSIGNED andalso not ReasignToken ->
+            Reply = {ok, State#state.access_token},
+            {reply, Reply, StateName, State};
+        true ->
+            {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
+                get_server_access_token_queue = queue:cons(From, State#state.get_server_access_token_queue),
+                access_token = undefined,
+                access_token_expiry_tref = cancel_timer(State),
+                max_reconnect_attempts = ?MAX_RECONNECT_ATTEMPTS
+            }, 0}
+    end;
 
 handle_sync_event(Event, From, StateName, State) ->
     lager:notice("handle_sync_event - got unkown event: ~p from: ~p...", [Event, From]),
