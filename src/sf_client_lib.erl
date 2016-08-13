@@ -58,6 +58,8 @@ request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, Retries) when 
 %%            sf_client_access_token_server:reasign_server_access_token(),
             timer:sleep(Timeout),
             request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, Retries - 1);
+        {error, _Reason}=Err ->
+            Err;
         {error, _Code, _Header, Body} ->
             try
                 error_m:fail(hd(Body))

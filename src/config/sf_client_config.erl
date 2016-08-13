@@ -38,13 +38,14 @@ init() ->
           end}]}
         ,{sf_rest_api_version_path, "SF_REST_API_VERSION_PATH", [{default, fun() ->
               RestApiEndpoint = get_sf_rest_api_endpoint(),
-              case restc:request(get, json, <<RestApiEndpoint/binary, "/services/data/">>, [200]) of
-                  {ok, 200, _Header, Body} ->
+              ServiceDataUrl = restc:construct_url(binary_to_list(RestApiEndpoint), "/services/data/", []),
+              case sf_client_lib:request([], get, 200, ServiceDataUrl, false) of
+                  {ok, Body} ->
                       VersionPath = find_iterator(get_sf_rest_api_version(), Body),
                       lager:debug("Found a SalesForce REST API version path: ~s", [VersionPath]),
                       VersionPath;
-                  {error, _ErrorCode, _Header, _Body} ->
-                      lager:error("Error while trying to list available REST API versions"),
+                  {error, Reason} ->
+                      lager:error("Error while trying to list available REST API versions; Reason: ~p", [Reason]),
                       throw("No available REST API versions path found")
               end
           end}]}
@@ -116,14 +117,14 @@ get_required(AppEnv, Key) ->
 find_iterator(_SearchedVersion, []) ->
     <<"/services/data/v37.0">>;
 find_iterator(SearchedVersion, [VersionTuple | Tail]) ->
-    case version_compare(SearchedVersion, lists:keyfind(<<"version">>, 1, VersionTuple)) of
+    case version_compare(SearchedVersion, st_traverse_utils:traverse_by_path(<<"version">>, VersionTuple)) of
         true ->
-            element(2, lists:keyfind(<<"url">>, 1, VersionTuple));
+            st_traverse_utils:traverse_by_path(<<"url">>, VersionTuple);
         false ->
             find_iterator(SearchedVersion, Tail)
     end.
 
-version_compare(SearchedVersion, {_, SearchedVersion}) ->
+version_compare(SearchedVersion, SearchedVersion) ->
     true;
 version_compare(_, _) ->
     false.
