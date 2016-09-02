@@ -1,0 +1,15 @@
+case erlang:function_exported(rebar3, main, 1) of
+    true -> % rebar3
+        CONFIG;
+    false -> % rebar 2.x or older
+        %% Rebuild deps, possibly including those that have been moved to
+        %% profiles
+        [{deps, [
+             {lager,       ".*", {git, "https://github.com/basho/lager.git", {tag, "3.2.1"}}}
+            ,{restc,       ".*", {git, "https://github.com/synlay/restclient.git", "fdaf3d112f0e028a2702b3f3ed6ef327e6c0b410"}}
+            ,{stillir,     ".*", {git, "https://github.com/heroku/stillir.git", {tag, "1.0.0"}}}
+            ,{st_commons,  ".*", {git, "https://github.com/synlay/st_commons.git", {branch, "develop"}}}
+            ,{erlando,     ".*", {git, "https://github.com/rabbitmq/erlando.git", "1c1ef25a9bc228671b32b4a6ee30c7525314b1fd"}}
+            ,{parse_trans, ".*", {git, "https://github.com/uwiger/parse_trans.git", {tag, "3.0.0"}}}
+        ]} | [Config || {Key, _Value}=Config <- CONFIG, Key =/= deps andalso Key =/= plugins]]
+end.
