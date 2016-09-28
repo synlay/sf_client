@@ -147,7 +147,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 init_sf_mappings() ->
 
-    SObjectsMapping = maps:fold(fun(Module, ModelIdentifier, Acc) ->
+    SObjectsMapping = maps:fold(fun(ModelIdentifier, Module, Acc) ->
         SObjectTableName = Module:sobject_table_name(),
         Acc#{SObjectTableName => [{Module, ModelIdentifier} | maps:get(SObjectTableName, Acc, [])]}
     end, #{}, sf_client_config:get_sobjects_mapping()),
