@@ -156,7 +156,7 @@ init([]) ->
             {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
                 max_reconnect_attempts = State#state.max_reconnect_attempts - 1,
                 attempt_error_msg = Reason
-            }, sf_client_config:get_access_token_server_request_retry_timeout() * 1000}
+            }, 2000}
     end;
 
 ?ACCESS_TOKEN_UNASSIGNED(timeout, State) ->

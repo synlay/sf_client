@@ -76,7 +76,9 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     ets:new(?MODULE, [public, named_table, {read_concurrency, true}]),
-    _ = init_sf_mappings(),
+    %% Spawn a separate process for the initialization so the library won't crash and calls to the
+    %% API will return `mapping_not_found` until the initialization successfully completes
+    _ = spawn(fun() -> init_sf_mappings() end),
     {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -151,11 +153,13 @@ init_sf_mappings() ->
     end, #{}, sf_client_config:get_sobjects_mapping()),
 
     ApiEndpoint = sf_client_config:get_sf_rest_api_endpoint(),
-    ApiVersionPath = sf_client_config:get_sf_rest_api_version_path(),
 
-    Url = restc:construct_url(binary_to_list(ApiEndpoint), binary_to_list(ApiVersionPath), []),
-
+    Return =
     do([error_m ||
+        ApiVersionPath <- sf_client_config:get_sf_rest_api_version_path(),
+
+        Url = restc:construct_url(binary_to_list(ApiEndpoint), binary_to_list(ApiVersionPath), []),
+
         Response <- sf_client_lib:request(get, 200, Url),
         SObjectsPath <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"sobjects">>, Response),
                                                      error_m, no_name_attribute_found),
@@ -187,4 +191,12 @@ init_sf_mappings() ->
             true ->
                 ok
         end
-    ]).
+    ]),
+    case Return of
+        ok ->
+            ok;
+        {error, Reason} ->
+            lager:error("Unable to initialize sobjects mapping; Reason: ~p", [Reason]),
+            timer:sleep(2000),
+            init_sf_mappings()
+    end.

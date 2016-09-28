@@ -29,24 +29,26 @@
 init() ->
     stillir:set_config(?APP_ENV, [
          {sf_rest_api_version, "SF_REST_API_VERSION", [{transform, binary}, {default, fun() ->
-              list_to_binary(get_config(sf_rest_api_version))
+              maybe_to_binary(get_config(sf_rest_api_version))
           end}]}
-        ,{sf_rest_api_endpoint, "SF_REST_API_ENDPOINT", [{transform, fun(_) ->
-              list_to_binary("https://" ++ get_config(sf_rest_api_endpoint))
+        ,{sf_rest_api_endpoint, "SF_REST_API_ENDPOINT", [{transform, fun(Endpoint) ->
+              list_to_binary(maybe_prefix_with_https(Endpoint))
           end}, {default, fun() ->
-              list_to_binary("https://" ++ get_config(sf_rest_api_endpoint))
+              maybe_to_binary(maybe_prefix_with_https(get_config(sf_rest_api_endpoint)))
           end}]}
-        ,{sf_rest_api_version_path, "SF_REST_API_VERSION_PATH", [{default, fun() ->
+        ,{sf_rest_api_version_path, "_INTERNAL_SF_REST_API_VERSION_PATH", [{transform, fun(_) ->
+              error_m:fail(dont_set_sf_rest_api_version_path)
+          end}, {default, fun() ->
               RestApiEndpoint = get_sf_rest_api_endpoint(),
               ServiceDataUrl = restc:construct_url(binary_to_list(RestApiEndpoint), "/services/data/", []),
               case sf_client_lib:request([], get, 200, ServiceDataUrl, false) of
                   {ok, Body} ->
                       VersionPath = find_iterator(get_sf_rest_api_version(), Body),
                       lager:debug("Found a SalesForce REST API version path: ~s", [VersionPath]),
-                      VersionPath;
+                      error_m:return(VersionPath);
                   {error, Reason} ->
                       lager:error("Error while trying to list available REST API versions; Reason: ~p", [Reason]),
-                      throw("No available REST API versions path found")
+                      error_m:fail(no_available_rest_api_version_path)
               end
           end}]}
         ,{sf_credentials_client_id, "SF_CREDENTIALS_CLIENT_ID", [{default, fun() ->
@@ -128,3 +130,22 @@ version_compare(SearchedVersion, SearchedVersion) ->
     true;
 version_compare(_, _) ->
     false.
+
+
+-spec maybe_to_binary(Value :: list() | binary()) -> Result :: binary().
+maybe_to_binary(Value) when is_list(Value) ->
+    list_to_binary(Value);
+
+maybe_to_binary(Value) ->
+    Value.
+
+
+-spec maybe_prefix_with_https(MaybeURL :: binary() | list()) -> URL :: binary() | list().
+maybe_prefix_with_https(<<"https://", _Domain/binary>>=URL) ->
+    URL;
+
+maybe_prefix_with_https("https://" ++ _Domain=URL) ->
+    URL;
+
+maybe_prefix_with_https(Domain) ->
+    "https://" ++ Domain.
