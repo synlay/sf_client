@@ -44,10 +44,10 @@ init() ->
               case sf_client_lib:request([], get, 200, ServiceDataUrl, false) of
                   {ok, Body} ->
                       VersionPath = find_iterator(get_sf_rest_api_version(), Body),
-                      lager:debug("Found a SalesForce REST API version path: ~s", [VersionPath]),
+                      _ = lager:debug("Found a SalesForce REST API version path: ~s", [VersionPath]),
                       error_m:return(VersionPath);
                   {error, Reason} ->
-                      lager:error("Error while trying to list available REST API versions; Reason: ~p", [Reason]),
+                      _ = lager:error("Error while trying to list available REST API versions; Reason: ~p", [Reason]),
                       error_m:fail(no_available_rest_api_version_path)
               end
           end}]}

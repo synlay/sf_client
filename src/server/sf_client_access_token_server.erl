@@ -144,8 +144,8 @@ init([]) ->
                         {ok, TRefReturn} ->
                             TRefReturn;
                         {error, Reason} ->
-                            lager:info("Could not create timer for reasigning access token after it expires; "
-                                       "Reason: ~p", [Reason]),
+                            _ = lager:info("Could not create timer for reasigning access token after it expires; "
+                                           "Reason: ~p", [Reason]),
                             undefined
                     end;
                 true ->
@@ -247,7 +247,7 @@ handle_sync_event(reasign_server_access_token, From, StateName, State) ->
     end;
 
 handle_sync_event(Event, From, StateName, State) ->
-    lager:notice("handle_sync_event - got unkown event: ~p from: ~p...", [Event, From]),
+    _ = lager:notice("handle_sync_event - got unkown event: ~p from: ~p...", [Event, From]),
     {next_state, StateName, State}.
 
 
@@ -261,7 +261,7 @@ handle_sync_event(Event, From, StateName, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, StateName, State) ->
-    lager:notice("handle_info - got unkown info: ~p...", [Info]),
+    _ = lager:notice("handle_info - got unkown info: ~p...", [Info]),
     {next_state, StateName, State}.
 
 
@@ -325,10 +325,10 @@ init_system() ->
     ]),
     case sf_client_lib:request([], post, 200, Url, false) of
         {ok, Body} ->
-            lager:debug("Got new access token from SalesForce"),
+            _ = lager:debug("Got new access token from SalesForce"),
             {ok, st_traverse_utils:traverse_by_path(<<"access_token">>, Body),
                  (sf_client_config:get_access_token_expiry() - ExpiryDelta) * 1000};
         {error, Reason}=Err ->
-            lager:error("Could not authorize client credentials; Reason: ~p", [Reason]),
+            _ = lager:error("Could not authorize client credentials; Reason: ~p", [Reason]),
             Err
     end.

@@ -196,7 +196,7 @@ init_sf_mappings() ->
         ok ->
             ok;
         {error, Reason} ->
-            lager:error("Unable to initialize sobjects mapping; Reason: ~p", [Reason]),
+            _ = lager:error("Unable to initialize sobjects mapping; Reason: ~p", [Reason]),
             timer:sleep(2000),
             init_sf_mappings()
     end.

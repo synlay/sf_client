@@ -42,8 +42,8 @@ undefined_lift(Value, Monad, _Message) -> Monad:return(Value).
 
 random_timeout(LeftRetries, LogMessage, LogArgs) ->
     Timeout = st_math_lib:ceiling(2000 * rand:uniform() + 1000),
-    lager:debug(LogMessage ++ "  retrying the request after: ~p ms; Left retries: ~p",
-                LogArgs ++ [Timeout, LeftRetries]),
+    _ = lager:debug(LogMessage ++ "  retrying the request after: ~p ms; Left retries: ~p",
+                    LogArgs ++ [Timeout, LeftRetries]),
     timer:sleep(Timeout).
 
 
@@ -57,7 +57,7 @@ get_access_token_helper(Retries) when Retries > 0 ->
     end;
 
 get_access_token_helper(_Retries) ->
-    lager:error("Maximal retries reached for trying to get access token"),
+    _ = lager:error("Maximal retries reached for trying to get access token"),
     error_m:fail(get_access_token_max_retries).
 
 
@@ -89,5 +89,5 @@ request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, Retries) when 
     ]);
 
 request_helper(_DbModel, Action, _ExpectedStatusCode, Url, _UseAuth, _Retries) ->
-    lager:error("Maximal retries reached for '~p' request to URL: '~p'", [Action, Url]),
+    _ = lager:error("Maximal retries reached for '~p' request to URL: '~p'", [Action, Url]),
     error_m:fail(max_retries).
