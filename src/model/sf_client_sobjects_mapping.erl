@@ -36,6 +36,7 @@
 ]).
 
 
+-spec new(MappingModule :: mapping_module(), MappingUrl :: mapping_url()) -> model().
 new(MappingModule, MappingUrl) ->
     #model{
          mapping_module = MappingModule

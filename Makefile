@@ -1,7 +1,7 @@
-ifeq ($(bamboo_BUILD_ON_CI_ENV),true)
-	BUILD_ON_CI_ENV = true
+ifeq ($(CI),true)
+	CI_ENV = true
 else
-	BUILD_ON_CI_ENV = false
+	CI_ENV = false
 endif
 
 REBAR=rebar3
@@ -34,5 +34,14 @@ distclean:
 
 rebuild: distclean all
 
+ci: test dialyze
+
+travis_ci: ci coveralls
+
+coveralls:
+	@$(REBAR) as test coveralls send
+
 rel:
 	@$(REBAR) as prod release
+
+.PHONY: compile typer pdf test distclean rel dialyze ci coveralls travis_ci
