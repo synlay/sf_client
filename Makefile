@@ -4,7 +4,13 @@ else
 	CI_ENV = false
 endif
 
-REBAR=rebar3
+# If there is a rebar3 in the current directory, use it
+ifeq ($(wildcard rebar3),rebar3)
+REBAR = $(CURDIR)/rebar3
+endif
+
+# Fallback to rebar3 on PATH
+REBAR ?= $(shell which rebar3)
 
 all: compile test dialyze
 

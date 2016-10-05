@@ -1,4 +1,4 @@
-case erlang:function_exported(rebar3, main, 1) of
+MaybeUpdatedConfig = case erlang:function_exported(rebar3, main, 1) of
     true -> % rebar3
         CONFIG;
     false -> % rebar 2.x or older
@@ -12,4 +12,11 @@ case erlang:function_exported(rebar3, main, 1) of
             ,{erlando,     ".*", {git, "https://github.com/rabbitmq/erlando.git", "1c1ef25a9bc228671b32b4a6ee30c7525314b1fd"}}
             ,{parse_trans, ".*", {git, "https://github.com/uwiger/parse_trans.git", {tag, "3.0.0"}}}
         ]} | [Config || {Key, _Value}=Config <- CONFIG, Key =/= deps andalso Key =/= plugins]]
+end,
+case os:getenv("TRAVIS") of
+    "true" ->
+        JobId = os:getenv("TRAVIS_JOB_ID"),
+        lists:keystore(coveralls_service_job_id, 1, MaybeUpdatedConfig, {coveralls_service_job_id, JobId});
+    _ ->
+        MaybeUpdatedConfig
 end.
