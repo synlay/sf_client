@@ -8,6 +8,7 @@
         ,stdlib
         ,lager
         ,restc
+        ,stillir
     ]},
     {env,[]},
     {modules, []},
