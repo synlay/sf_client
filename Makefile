@@ -23,7 +23,7 @@ typer:
 pdf:
 	pandoc README.md -o README.pdf
 
-ifeq ($(BUILD_ON_CI_ENV),true)
+ifeq ($(CI_ENV),true)
 test:
 	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app.config -sasl errlog_type _" $(REBAR) eunit
 else
