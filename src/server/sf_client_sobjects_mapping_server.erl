@@ -11,7 +11,10 @@
 
 -compile({parse_transform, do}).
 
--behaviour(gen_server).
+-define(UNCONFIGURED, unconfigured).
+-define(CONFIGURED, configured).
+
+-behaviour(gen_fsm).
 
 -include_lib("st_commons/include/st_commons.hrl").
 
@@ -19,16 +22,16 @@
 -export([
      start_link/0
     ,get_sobjects_mapping/1
+    ,reinitialize_sf_mapping/0
 ]).
 
-%% gen_server callbacks
 -export([
     init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
+    handle_event/3,
+    handle_sync_event/4,
+    handle_info/3,
+    terminate/3,
+    code_change/4
 ]).
 
 -define(SERVER, ?MODULE).
@@ -48,104 +51,137 @@ get_sobjects_mapping(MappingKey) ->
             error_m:return(Value)
     end.
 
+%%-spec reinitialize_sf_mapping() -> {ok, Result} | {error, Reason} when
+%%    Result           :: access_token(),
+%%    Reason           :: term().
+reinitialize_sf_mapping() ->
+    case catch gen_fsm:sync_send_all_state_event(?MODULE, reinitialize,
+                                   sf_client_config:get_access_token_server_request_retry_timeout() * (5 + 1) * 1000) of
+        {'EXIT', {timeout, _}} ->
+            {error, 'timeout_while_trying_to_communicate_with_sf_mapping_server'};
+        Other ->
+            Other
+    end.
+
+
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts the server
+%% Creates a gen_fsm process which calls Module:init/1 to
+%% initialize. To ensure a synchronized start-up procedure, this
+%% function does not return until Module:init/1 has returned.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec(start_link() -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_fsm:start_link({local, ?MODULE}, ?MODULE, [], []).
+
 
 %%%===================================================================
-%%% gen_server callbacks
+%%% gen_fsm callbacks
 %%%===================================================================
 
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server
+%% Whenever a gen_fsm is started using gen_fsm:start/[3,4] or
+%% gen_fsm:start_link/[3,4], this function is called by the new
+%% process to initialize.
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    ets:new(?MODULE, [public, named_table, {read_concurrency, true}]),
-    %% Spawn a separate process for the initialization so the library won't crash and calls to the
-    %% API will return `mapping_not_found` until the initialization successfully completes
-    _ = spawn(fun() -> init_sf_mappings() end),
-    {ok, #state{}}.
+    _ = ets:new(?MODULE, [public, named_table, {read_concurrency, true}]),
+    _ = spawn(fun() -> catch gen_fsm:sync_send_all_state_event(?MODULE, reinitialize) end),
+    {ok, ?UNCONFIGURED, #state{}}.
+
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Handling call messages
+%% Whenever a gen_fsm receives an event sent using
+%% gen_fsm:send_all_state_event/2, this function is called to handle
+%% the event.
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call(_Request, _From, State) ->
-  {reply, ok, State}.
+handle_event(_Event, StateName, State) ->
+    {next_state, StateName, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Handling cast messages
+%% Whenever a gen_fsm receives an event sent using
+%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
+%% to handle the event.
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(_Request, State) ->
-  {noreply, State}.
+handle_sync_event(reinitialize, _From, _StateName, State) ->
+    case init_sf_mappings(5) of
+        ok ->
+            {reply, ok, ?CONFIGURED, State};
+        {error, _Reason}=Err ->
+            {reply, Err, ?UNCONFIGURED, State}
+    end;
+
+
+handle_sync_event(Event, From, StateName, State) ->
+    _ = lager:notice("handle_sync_event - got unkown event: ~p from: ~p...", [Event, From]),
+    {next_state, StateName, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Handling all non call/cast messages
+%% This function is called by a gen_fsm when it receives any
+%% message other than a synchronous or asynchronous event
+%% (or a system message).
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
-  {noreply, State}.
+handle_info(Info, StateName, State) ->
+    _ = lager:notice("handle_info - got unkown info: ~p...", [Info]),
+    {next_state, StateName, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% This function is called by a gen_server when it is about to
+%% This function is called by a gen_fsm when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
+%% necessary cleaning up. When it returns, the gen_fsm terminates with
+%% Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(_Reason, _StateName, _State) ->
     true = ets:delete(?MODULE),
     ok.
+
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
-  {ok, State}.
+code_change(_OldVsn, StateName, State, _Extra) ->
+    {ok, StateName, State}.
+
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
 
-init_sf_mappings() ->
+init_sf_mappings(MaxRetries) when MaxRetries =< 0 ->
+    error_m:fail(max_retries);
+
+init_sf_mappings(MaxRetries) ->
 
     SObjectsMapping = maps:fold(fun(ModelIdentifier, Module, Acc) ->
         SObjectTableName = Module:sobject_table_name(),
@@ -194,9 +230,9 @@ init_sf_mappings() ->
     ]),
     case Return of
         ok ->
-            ok;
+            error_m:return(ok);
         {error, Reason} ->
             _ = lager:error("Unable to initialize sobjects mapping; Reason: ~p", [Reason]),
             timer:sleep(2000),
-            init_sf_mappings()
+            init_sf_mappings(MaxRetries - 1)
     end.

@@ -20,6 +20,7 @@
 ]).
 
 
+-spec request(Action :: restc:method(), ExpectedStatusCode :: restc:status_code(), Url :: restc:url()) -> {ok, Body :: restc:body()} | {error, Reason :: any()}.
 request(Action, ExpectedStatusCode, Url) ->
     request([], Action, ExpectedStatusCode, Url).
 

@@ -12,20 +12,11 @@
  {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
  {<<"metrics">>,{pkg,<<"metrics">>,<<"1.0.1">>},1},
  {<<"mimerl">>,{pkg,<<"mimerl">>,<<"1.0.2">>},1},
- {<<"mochiweb_util">>,
-  {git,"https://github.com/kivra/mochiweb_util",
-       {ref,"de4fd402f7c1e1a6e683f73a41ae863b69888402"}},
-  1},
+ {<<"mochiweb_util">>,{pkg,<<"mochiweb_util">>,<<"0.1.0">>},1},
  {<<"parse_trans">>,{pkg,<<"parse_trans">>,<<"3.0.0">>},0},
- {<<"restc">>,
-  {git,"https://github.com/synlay/restclient.git",
-       {ref,"fdaf3d112f0e028a2702b3f3ed6ef327e6c0b410"}},
-  0},
+ {<<"restc">>,{pkg,<<"restc">>,<<"0.3.4">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.0">>},1},
- {<<"st_commons">>,
-  {git,"https://github.com/synlay/st_commons.git",
-       {ref,"ea0fc9116b9524ab68d16e8e19a29e1beee19809"}},
-  0},
+ {<<"st_commons">>,{pkg,<<"st_commons">>,<<"1.2.1">>},0},
  {<<"stillir">>,{pkg,<<"stillir">>,<<"1.0.0">>},0}]}.
 [
 {pkg_hash,[
@@ -38,7 +29,10 @@
  {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
  {<<"metrics">>, <<"25F094DEA2CDA98213CECC3AEFF09E940299D950904393B2A29D191C346A8486">>},
  {<<"mimerl">>, <<"993F9B0E084083405ED8252B99460C4F0563E41729AB42D9074FD5E52439BE88">>},
+ {<<"mochiweb_util">>, <<"ECD20D44C6A8E19D1D6E5FE6921E55E921DA6E42F8757A00FF901C7AD4DC5D3D">>},
  {<<"parse_trans">>, <<"9E96B1C9C3A0DF54E7B76F8F685D38BFA1EB21B31E042B1D1A5A70258E4DB1E3">>},
+ {<<"restc">>, <<"C17ADE2C5C64ED1520DF5C4A8E98FF601440EA135E68EFA2355C81E8640AB23F">>},
  {<<"ssl_verify_fun">>, <<"EDEE20847C42E379BF91261DB474FFBE373F8ACB56E9079ACB6038D4E0BF414F">>},
+ {<<"st_commons">>, <<"D43E8A6F38884B0E8FB439723E281F4F9BFFA1FD88E1A4293AD753B138429750">>},
  {<<"stillir">>, <<"9E77EAADD2418A61EC7398C01E29DEA26D14F51C42E0B309084493E3ED33337A">>}]}
 ].

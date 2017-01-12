@@ -11,6 +11,8 @@
 
 -define (APP_ENV, sf_client).
 
+-type sobjects_mapping() :: st_common_types:map_(sf_client:mapping_key(), module()).
+
 %% API
 -export([
      init/0
@@ -25,6 +27,11 @@
     ,get_access_token_server_request_retry_timeout/0
     ,get_sobjects_mapping/0
 ]).
+
+-export_type([
+    sobjects_mapping/0
+]).
+
 
 init() ->
     stillir:set_config(?APP_ENV, [
@@ -95,6 +102,8 @@ get_access_token_expiry() ->
 get_access_token_server_request_retry_timeout() ->
     get_config(access_token_server_request_retry_timeout).
 
+
+-spec get_sobjects_mapping() -> sobjects_mapping().
 get_sobjects_mapping() ->
     get_config(sobjects_mapping).
 
@@ -116,8 +125,9 @@ get_required(AppEnv, Key) ->
             Value
     end.
 
+
 find_iterator(_SearchedVersion, []) ->
-    <<"/services/data/v37.0">>;
+    <<"/services/data/v39.0">>;
 find_iterator(SearchedVersion, [VersionTuple | Tail]) ->
     case version_compare(SearchedVersion, st_traverse_utils:traverse_by_path(<<"version">>, VersionTuple)) of
         true ->
@@ -125,6 +135,7 @@ find_iterator(SearchedVersion, [VersionTuple | Tail]) ->
         false ->
             find_iterator(SearchedVersion, Tail)
     end.
+
 
 version_compare(SearchedVersion, SearchedVersion) ->
     true;

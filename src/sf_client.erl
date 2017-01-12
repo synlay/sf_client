@@ -11,15 +11,32 @@
 
 -compile({parse_transform, do}).
 
+-type mapping_key() :: atom().
+-type model() :: any().
+-type sf_sobject_id() :: binary().
+
 %% API
 -export([
-     create/2
+     reinitialize_client/0
+    ,create/2
     ,update/3
     ,delete/2
     ,get_sobject_id_by_model/2
 ]).
 
+-export_type([
+     mapping_key/0
+    ,model/0
+    ,sf_sobject_id/0
+]).
 
+
+reinitialize_client() ->
+    sf_client_config:init(),
+    sf_client_sobjects_mapping_server:reinitialize_sf_mapping().
+
+
+-spec create(MappingKey :: mapping_key(), Model :: model()) -> {ok, Id :: sf_sobject_id()} | {error, Reason :: any()}.
 create(MappingKey, Model) ->
     do([error_m ||
         {MappingModule, MappingUrl} <- get_model_mapping_config(MappingKey),
@@ -32,6 +49,7 @@ create(MappingKey, Model) ->
     ]).
 
 
+-spec update(MappingKey :: mapping_key(), SObjectId :: sf_sobject_id(), Model :: model()) -> ok | {error, Reason :: any()}.
 update(MappingKey, SObjectId, Model) ->
     do([error_m ||
         {MappingModule, MappingUrl} <- get_model_mapping_config(MappingKey),
@@ -42,6 +60,7 @@ update(MappingKey, SObjectId, Model) ->
     ]).
 
 
+-spec delete(MappingKey :: mapping_key(), SObjectId :: sf_sobject_id()) -> ok | {error, Reason :: any()}.
 delete(MappingKey, SObjectId) ->
     do([error_m ||
         {_MappingModule, MappingUrl} <- get_model_mapping_config(MappingKey),
@@ -51,6 +70,7 @@ delete(MappingKey, SObjectId) ->
     ]).
 
 
+-spec get_sobject_id_by_model(MappingKey :: mapping_key(), Model :: model()) -> {ok, SObjectId :: sf_sobject_id()} | {error, Reason :: any()}.
 get_sobject_id_by_model(MappingKey, Model) ->
     do([error_m ||
         {ModelId, SObject} <- find_sobject_by_model(MappingKey, Model, [{"fields", "Id"}]),

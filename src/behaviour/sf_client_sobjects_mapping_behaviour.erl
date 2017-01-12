@@ -21,12 +21,12 @@
     ,db_sobject/0
 ]).
 
--callback new_sobject_from_model(Model :: any()) -> DbSObject :: db_sobject().
+-callback new_sobject_from_model(Model :: sf_client:model()) -> DbSObject :: db_sobject().
 
 -callback sobject_table_name() -> sobject_table_name().
 
 -callback sobject_external_id_attribute_name() -> sobject_external_id_attribute_name().
 
--callback model_id(Model :: any()) -> model_id().
+-callback model_id(Model :: sf_client:model()) -> model_id().
 
--callback to_string(Model :: any()) -> string().
+-callback to_string(Model :: sf_client:model()) -> string().

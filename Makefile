@@ -25,10 +25,16 @@ pdf:
 
 ifeq ($(CI_ENV),true)
 test:
-	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app.config -sasl errlog_type _" $(REBAR) eunit
+	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) eunit
+
+cover:
+	@$(REBAR) as test cover
 else
 test:
-	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app.config -sasl errlog_type _" $(REBAR) as dev_console eunit
+	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console eunit
+
+cover:
+	@$(REBAR) as dev_console cover
 endif
 
 dialyze:
@@ -50,7 +56,7 @@ coveralls:
 rel:
 	@$(REBAR) as prod release
 
-.PHONY: compile typer pdf test distclean rel dialyze dialyzer_concrete ci coveralls travis_ci
+.PHONY: compile typer pdf test distclean rel dialyze dialyzer_concrete ci cover coveralls travis_ci
 
 ########################################################################################################################
 #                   TEMPORARY REBAR3 Dialyzer performance error workaround based on concrete                           #
