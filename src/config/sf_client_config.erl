@@ -16,6 +16,7 @@
 %% API
 -export([
      init/0
+    ,application/0
     ,get_sf_rest_api_version/0
     ,get_sf_rest_api_endpoint/0
     ,get_sf_rest_api_version_path/0
@@ -44,6 +45,7 @@ init() ->
               maybe_to_binary(maybe_prefix_with_https(get_config(sf_rest_api_endpoint)))
           end}]}
         ,{sf_rest_api_version_path, "_INTERNAL_SF_REST_API_VERSION_PATH", [{transform, fun(_) ->
+              %% sf_rest_api_version_path will be generated at runtime and can't be configured through the config
               error_m:fail(dont_set_sf_rest_api_version_path)
           end}, {default, fun() ->
               RestApiEndpoint = get_sf_rest_api_endpoint(),
@@ -75,30 +77,53 @@ init() ->
           end}]}
     ]).
 
+
+-spec application() -> ?APP_ENV.
+application() ->
+    ?APP_ENV.
+
+
+-spec get_sf_rest_api_version() -> binary().
 get_sf_rest_api_version() ->
     stillir:get_config(?APP_ENV, sf_rest_api_version).
 
+
+-spec get_sf_rest_api_endpoint() -> binary().
 get_sf_rest_api_endpoint() ->
     stillir:get_config(?APP_ENV, sf_rest_api_endpoint).
 
+
+-spec get_sf_rest_api_version_path() -> {ok, binary()} | {error, no_available_rest_api_version_path | dont_set_sf_rest_api_version_path}.
 get_sf_rest_api_version_path() ->
     stillir:get_config(?APP_ENV, sf_rest_api_version_path).
 
+
+-spec get_credentials_client_id() -> string().
 get_credentials_client_id() ->
     stillir:get_config(?APP_ENV, sf_credentials_client_id).
 
+
+-spec get_credentials_client_secret() -> string().
 get_credentials_client_secret() ->
     stillir:get_config(?APP_ENV, sf_credentials_client_secret).
 
+
+-spec get_credentials_username() -> string().
 get_credentials_username() ->
     stillir:get_config(?APP_ENV, sf_credentials_username).
 
+
+-spec get_credentials_password() -> string().
 get_credentials_password() ->
     stillir:get_config(?APP_ENV, sf_credentials_password).
 
+
+-spec get_access_token_expiry() -> pos_integer().
 get_access_token_expiry() ->
     stillir:get_config(?APP_ENV, sf_access_token_expiry).
 
+
+-spec get_access_token_server_request_retry_timeout() -> pos_integer().
 get_access_token_server_request_retry_timeout() ->
     get_config(access_token_server_request_retry_timeout).
 
@@ -120,7 +145,7 @@ get_config(Config) ->
 get_required(AppEnv, Key) ->
     case application:get_env(AppEnv, Key) of
         undefined ->
-            throw({missing_config, Key});
+            erlang:error({missing_config, Key});
         {ok, Value} ->
             Value
     end.

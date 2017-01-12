@@ -32,8 +32,10 @@
 
 
 reinitialize_client() ->
-    sf_client_config:init(),
-    sf_client_sobjects_mapping_server:reinitialize_sf_mapping().
+    _ = sf_client_config:init(),
+    _ = sf_client_sobjects_mapping_server:reinitialize_sf_mapping(),
+    _ = sf_client_access_token_server:reasign_server_access_token(),
+    ok.
 
 
 -spec create(MappingKey :: mapping_key(), Model :: model()) -> {ok, Id :: sf_sobject_id()} | {error, Reason :: any()}.
