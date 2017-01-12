@@ -46,8 +46,8 @@ distclean:
 
 rebuild: distclean all
 
-#ci: test
-ci: test dialyzer_concrete
+#ci: test dialyzer_concrete
+ci: test
 
 travis_ci: ci coveralls
 
