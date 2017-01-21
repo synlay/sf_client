@@ -67,17 +67,9 @@ get_server_access_token() ->
     end.
 
 
--spec reasign_server_access_token() -> {ok, Result} | {error, Reason} when
-    Result           :: access_token(),
-    Reason           :: term().
+-spec reasign_server_access_token() -> ok.
 reasign_server_access_token() ->
-    case catch gen_fsm:sync_send_all_state_event(?MODULE, reasign_server_access_token,
-             sf_client_config:get_access_token_server_request_retry_timeout() * (?MAX_RECONNECT_ATTEMPTS + 1) * 1000) of
-        {'EXIT', {timeout, _}} ->
-            {error, 'timeout_while_trying_to_communicate_with_auth_server'};
-        Other ->
-            Other
-    end.
+    gen_fsm:send_all_state_event(?MODULE, reasign_server_access_token).
 
 
 %%--------------------------------------------------------------------
@@ -188,8 +180,7 @@ init([]) ->
 %%--------------------------------------------------------------------
 ?ACCESS_TOKEN_UNASSIGNED(get_server_access_token, From, State) ->
     {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
-        get_server_access_token_queue = queue:cons(From, State#state.get_server_access_token_queue),
-        max_reconnect_attempts = ?MAX_RECONNECT_ATTEMPTS
+        get_server_access_token_queue = queue:cons(From, State#state.get_server_access_token_queue)
     }, 0}.
 
 
@@ -207,7 +198,20 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_event(_Event, StateName, State) ->
+handle_event(reasign_server_access_token, StateName, State) ->
+    {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
+        access_token = undefined,
+        access_token_expiry_tref = cancel_timer(State),
+        max_reconnect_attempts = if
+            StateName == ?ACCESS_TOKEN_ASSIGNED ->
+                ?MAX_RECONNECT_ATTEMPTS;
+            true ->
+                State#state.max_reconnect_attempts
+        end
+    }, 0};
+
+handle_event(Event, StateName, State) ->
+    _ = lager:notice("handle_event - got unkown event: ~p in state: ~p from: ~p...", [Event, StateName]),
     {next_state, StateName, State}.
 
 
@@ -220,16 +224,8 @@ handle_event(_Event, StateName, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(reasign_server_access_token, From, _StateName, State) ->
-    {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
-        get_server_access_token_queue = queue:cons(From, State#state.get_server_access_token_queue),
-        access_token = undefined,
-        access_token_expiry_tref = cancel_timer(State),
-        max_reconnect_attempts = ?MAX_RECONNECT_ATTEMPTS
-    }, 0};
-
 handle_sync_event(Event, From, StateName, State) ->
-    _ = lager:notice("handle_sync_event - got unkown event: ~p from: ~p...", [Event, From]),
+    _ = lager:notice("handle_sync_event - got unkown event: ~p in state: ~p from: ~p...", [Event, StateName, From]),
     {next_state, StateName, State}.
 
 
