@@ -31,7 +31,7 @@ fixture_test_() ->
 
 sf_client_config_sf_rest_api_test(_) ->
 
-    UrlType = ?LET(UrlParts, {oneof([return(""), return("https://")]), list(range(1,255))}, begin
+    UrlType = ?LET(UrlParts, {oneof([return(""), return("https://")]), non_empty(list(range($ , $~)))}, begin
         {Protocol, Domain} = UrlParts,
         string:concat(Protocol, Domain)
     end),
@@ -47,21 +47,23 @@ sf_client_config_sf_rest_api_test(_) ->
     EndpointUrlProp = ?FORALL(URL, UrlType,
     begin
         true = os:putenv("SF_REST_API_ENDPOINT", URL),
-        MeckURL = URL ++ "/services/data",
-        meck:expect(restc, request, fun(get, json, MeckURL, [200], [], []) ->
-                                            ?RESTC_RESPONSE(200, [], [#{
-                                                <<"version">> => <<"39.0">>
-                                                ,<<"url">> => <<"/services/data/v39.0">>
-                                            }])
-                                    end),
-        sf_client_config:init(),
-        {ok, <<"/services/data/v39.0">>} == sf_client_config:get_sf_rest_api_version_path() andalso
+        HttpsUrl =
         case URL of
             "https://" ++ _ ->
-                list_to_binary(URL) == sf_client_config:get_sf_rest_api_endpoint();
+                URL;
             URL ->
-                list_to_binary("https://" ++ URL) == sf_client_config:get_sf_rest_api_endpoint()
-        end
+                "https://" ++ URL
+        end,
+        MeckURL = restc:construct_url(HttpsUrl, "/services/data", []),
+        meck:expect(restc, request, fun(get, json, Path, [200], [], []) when Path == MeckURL ->
+            ?RESTC_RESPONSE(200, [], [#{
+                <<"version">> => <<"39.0">>
+                ,<<"url">> => <<"/services/data/v39.0">>
+            }])
+        end),
+        sf_client_config:init(),
+        {ok, <<"/services/data/v39.0">>} == sf_client_config:get_sf_rest_api_version_path() andalso
+        list_to_binary(HttpsUrl) == sf_client_config:get_sf_rest_api_endpoint()
 
     end),
     CredentialProperty = ?FORALL({ClientId, ClientSecret, Username, Password, AccessTokenExpiry},

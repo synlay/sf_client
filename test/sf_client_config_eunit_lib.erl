@@ -17,6 +17,7 @@
 -define(MAPPING_KEY, ?MODULE).
 
 -define(RESTC_RESPONSE(ExpectedStatusCode, Header, Body), {ok, ExpectedStatusCode, Header, Body}).
+-define(RESTC_ERR_RESPONSE(ExpectedStatusCode, Header, Body), {error, ExpectedStatusCode, Header, Body}).
 
 %% API
 -export([
@@ -30,22 +31,16 @@
 %% API
 -export([
      setup/0
+    ,setup/1
     ,teardown/1
+    ,mock_access_token_request_success/1
 ]).
 
 
-setup() ->
+mock_access_token_request_success(AccessToken) ->
+    timer:sleep(100),
 
-    _ = ets:new(?MODULE, [public, named_table, set]),
-
-    application:ensure_all_started(restc),
-
-    ok = meck:new(sf_client_config, [passthrough]),
-    ok = meck:new(restc, [passthrough]),
-
-    meck:expect(sf_client_config, get_sobjects_mapping, fun() ->
-        #{?MODULE => ?MODULE}
-    end),
+    AccessTokenHeader = <<"Bearer ", AccessToken/binary>>,
 
     meck:expect(restc, request, fun
         %% sf_client_sobjects_mapping_server:init_sf_mappings/0@L163 - Get a List of Resources
@@ -58,7 +53,7 @@ setup() ->
         %% sf_client_access_token_server:init_system/0@L326 - Get an access token
         (post, json, "https://localhost/services/oauth2/token?grant_type=" ++ _, [200], [], []) ->
             ?RESTC_RESPONSE(200, [], #{
-                 <<"access_token">> => <<"ACCESS_TOKEN">>
+                 <<"access_token">> => AccessToken
                 ,<<"instance_url">> => <<"https://cs83.salesforce.com">>
                 ,<<"id">> => <<"https://test.salesforce.com/id/.../...">>
                 ,<<"token_type">> => <<"Bearer">>
@@ -67,15 +62,18 @@ setup() ->
             });
 
         %% sf_client_sobjects_mapping_server:init_sf_mappings/0@L167 - Get the sobjects path
-        (get, json, "https://localhost/services/data/v39.0", [200],[{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}],
-                                                                                                                  []) ->
+        (get, json, "https://localhost/services/data/v39.0", [200],[{<<"Authorization">>, Token}], []) when
+                                                                                           Token == AccessTokenHeader ->
             ?RESTC_RESPONSE(200, [], #{
                 <<"sobjects">> => <<"/services/data/v39.0/sobjects">>
             });
 
+        (get, json, "https://localhost/services/data/v39.0", [200],[{<<"Authorization">>, _InvalidGrant}], []) ->
+            invalid_grant();
+
         %% sf_client_sobjects_mapping_server:init_sf_mappings - Get the corresponding sobject urls
-        (get, json, "https://localhost/services/data/v39.0/sobjects", [200],
-                                                               [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], []) ->
+        (get, json, "https://localhost/services/data/v39.0/sobjects", [200], [{<<"Authorization">>, Token}], []) when
+                                                                                           Token == AccessTokenHeader ->
             ?RESTC_RESPONSE(200, [], #{
                 <<"sobjects">> => [#{
                      <<"name">> => sobject_table_name()
@@ -85,9 +83,14 @@ setup() ->
                 }]
             });
 
+        (get, json, "https://localhost/services/data/v39.0/sobjects", [200],
+                                                                          [{<<"Authorization">>, _InvalidGrant}], []) ->
+            invalid_grant();
+
         %% Create a new resource => sf_client:create...
         (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
-                                                          [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], DbModel) ->
+                                                                           [{<<"Authorization">>, Token}], DbModel) when
+                                                                                           Token == AccessTokenHeader ->
 
             SfInternalId = get_sf_id(DbModel),
             ExternalId = proplists:get_value(sobject_external_id_attribute_name(), DbModel),
@@ -99,10 +102,15 @@ setup() ->
                 ,<<"errors">> => []
             });
 
+        (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
+                                                                    [{<<"Authorization">>, _InvalidGrant}], _DbModel) ->
+            invalid_grant();
+
         %% Find the SF resource by the internal model id
         (get, json,
                 "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/External_ID__c/" ++ IdWithSufix,
-                                                        [200], [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], []) ->
+                                                                         [200], [{<<"Authorization">>, Token}], []) when
+                                                                                           Token == AccessTokenHeader ->
 
             [ExternalId, _Suffix] = binary:split(list_to_binary(IdWithSufix), <<"?fields=Id">>),
 
@@ -113,9 +121,14 @@ setup() ->
                     ?RESTC_RESPONSE(200, [], #{<<"Id">> => SfInternalId})
             end;
 
+        (get, json, "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/External_ID__c/" ++ _,
+                                                                   [200], [{<<"Authorization">>, _InvalidGrant}], []) ->
+            invalid_grant();
+
         %% Update a specific SF resource
         (patch, json, "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/" ++ SObjectIdStr, [204],
-                                                       [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], NewDbModel) ->
+                                                                        [{<<"Authorization">>, Token}], NewDbModel) when
+                                                                                           Token == AccessTokenHeader ->
 
             SObjectId = list_to_binary(SObjectIdStr),
             ExternalId = proplists:get_value(sobject_external_id_attribute_name(), NewDbModel),
@@ -124,9 +137,14 @@ setup() ->
 
             ?RESTC_RESPONSE(204, [], <<>>);
 
+        (patch, json, "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/" ++ _, [204],
+                                                                 [{<<"Authorization">>, _InvalidGrant}], _NewDbModel) ->
+            invalid_grant();
+
         %% Delete a specific SF resource
         (delete, json, "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/" ++ SObjectIdStr, [204],
-                                                               [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], []) ->
+                                                                                [{<<"Authorization">>, Token}], []) when
+                                                                                           Token == AccessTokenHeader ->
 
             SObjectId = list_to_binary(SObjectIdStr),
 
@@ -134,11 +152,37 @@ setup() ->
 
             ?RESTC_RESPONSE(204, [], <<>>);
 
+            (delete, json, "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/" ++ _, [204],
+                                                                          [{<<"Authorization">>, _InvalidGrant}], []) ->
+                invalid_grant();
+
         (Action, json, Url, [Status], _Auth, DbModel) ->
             ?debugVal({Action, Url, Status, _Auth, DbModel}),
             throw(not_implemented)
 
+    end).
+
+
+setup() ->
+    setup(<<"ACCESS_TOKEN">>).
+
+
+setup(AccessToken) ->
+
+    teardown(ok),
+
+    _ = ets:new(?MODULE, [public, named_table, set]),
+
+    application:ensure_all_started(restc),
+
+    ok = meck:new(sf_client_config, [passthrough]),
+    ok = meck:new(restc, [passthrough]),
+
+    meck:expect(sf_client_config, get_sobjects_mapping, fun() ->
+        #{?MODULE => ?MODULE}
     end),
+
+    mock_access_token_request_success(AccessToken),
 
     application:ensure_all_started(sf_client),
 
@@ -146,9 +190,10 @@ setup() ->
 
 
 teardown(_) ->
-    true = ets:delete(?MODULE),
+    catch ets:delete(?MODULE),
     catch meck:unload(sf_client_config),
     catch meck:unload(restc),
+    catch application:stop(sf_client),
     ok.
 
 
@@ -182,3 +227,14 @@ sobject_table_name() ->
 
 to_string(Model) ->
     binary_to_list(model_id(Model)).
+
+
+%%====================================================================
+%% Internal functions
+%%====================================================================
+
+
+invalid_grant() ->
+    ?RESTC_ERR_RESPONSE(401, [], #{
+        <<"error">> => <<"invalid_grant">>
+    }).

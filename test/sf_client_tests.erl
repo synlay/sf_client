@@ -14,6 +14,7 @@
 
 -define(MAPPING_KEY, sf_client_config_eunit_lib).
 
+-define(RESTC_ERR_RESPONSE(ExpectedStatusCode, Header, Body), {error, ExpectedStatusCode, Header, Body}).
 
 %%%============================================================================
 %%% API
@@ -23,28 +24,16 @@
 fixture_test_() ->
     {foreach, fun setup/0, fun teardown/1,
         [
-            fun sf_client_integration_test/1
+%%            fun sf_client_credentials_changed_test/1
         ]}.
 
 
-sf_client_integration_test(_) ->
+%%sf_client_access_token_exired_test(_) ->
+%%    ok.
 
-    Property = ?FORALL({Model1, Model2}, ?SUCHTHAT({Model1, Model2},
-                       {sf_client:model(), sf_client:model()},
-                       Model1 /= Model2),
-        begin
-            InternalModelId = make_ref(),
-            {ok, ID} = sf_client:create(?MAPPING_KEY, {InternalModelId, Model1}),
-            {ok, ID} = sf_client:get_sobject_id_by_model(?MAPPING_KEY, {InternalModelId, Model1}),
-            ok = sf_client:update(?MAPPING_KEY, ID, {InternalModelId, Model2}),
-            {ok, ID} = sf_client:get_sobject_id_by_model(?MAPPING_KEY, {InternalModelId, Model2}),
-            ok = sf_client:delete(?MAPPING_KEY, ID),
-            {error, not_found} = sf_client:get_sobject_id_by_model(?MAPPING_KEY, {InternalModelId, Model1}),
-            {error, not_found} = sf_client:get_sobject_id_by_model(?MAPPING_KEY, {InternalModelId, Model2}),
-            true
-        end),
 
-    ?_assert(proper:quickcheck(Property, [{to_file, user}])).
+%%sf_client_credentials_changed_test(_) ->
+%%    ok.
 
 
 %%--------------------------------------------------------------------

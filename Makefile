@@ -23,15 +23,26 @@ typer:
 pdf:
 	pandoc README.md -o README.pdf
 
+test: eunit ct
+
 ifeq ($(CI_ENV),true)
-test:
+eunit:
 	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) eunit
+
+ct:
+	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) ct
 
 cover:
 	@$(REBAR) as test cover
 else
-test:
-	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console eunit
+eunit:
+#	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console eunit --cover --module=sf_client_tests
+	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console eunit --cover
+
+ct:
+#	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console ct --suite=test/sf_client_SUITE
+#	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console ct --suite=test/sf_client_access_token_server_SUITE
+	@ERL_FLAGS="-s lager -config $(CURDIR)/priv/app_test.config -sasl errlog_type _" $(REBAR) as dev_console ct
 
 cover:
 	@$(REBAR) as dev_console cover
@@ -57,7 +68,7 @@ coveralls:
 rel:
 	@$(REBAR) as prod release
 
-.PHONY: compile typer pdf test distclean rel dialyze dialyzer_concrete ci cover coveralls travis_ci
+.PHONY: compile typer pdf test distclean rel dialyze dialyzer_concrete eunit ct ci cover coveralls travis_ci
 
 ########################################################################################################################
 #                   TEMPORARY REBAR3 Dialyzer performance error workaround based on concrete                           #
