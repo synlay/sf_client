@@ -33,8 +33,8 @@
 
 reinitialize_client() ->
     _ = sf_client_config:init(),
-    _ = sf_client_sobjects_mapping_server:reinitialize_sf_mapping(),
     _ = sf_client_access_token_server:reasign_server_access_token(),
+    _ = sf_client_sobjects_mapping_server:reinitialize_sf_mapping(),
     ok.
 
 

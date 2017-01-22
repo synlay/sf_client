@@ -13,6 +13,8 @@
 
 -define(UNCONFIGURED, unconfigured).
 -define(CONFIGURED, configured).
+-define(MAX_RETRIES, 5).
+-define(REQUEST_RETRY_TIMEOUT, 2000).
 
 -behaviour(gen_fsm).
 
@@ -55,8 +57,7 @@ get_sobjects_mapping(MappingKey) ->
 %%    Result           :: access_token(),
 %%    Reason           :: term().
 reinitialize_sf_mapping() ->
-    case catch gen_fsm:sync_send_all_state_event(?MODULE, reinitialize,
-                                   sf_client_config:get_access_token_server_request_retry_timeout() * (5 + 1) * 1000) of
+    case catch gen_fsm:sync_send_all_state_event(?MODULE, reinitialize, ?REQUEST_RETRY_TIMEOUT * (?MAX_RETRIES + 1)) of
         {'EXIT', {timeout, _}} ->
             {error, 'timeout_while_trying_to_communicate_with_sf_mapping_server'};
         Other ->
@@ -120,7 +121,7 @@ handle_event(_Event, StateName, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_sync_event(reinitialize, _From, _StateName, State) ->
-    case init_sf_mappings(5) of
+    case init_sf_mappings(?MAX_RETRIES) of
         ok ->
             {reply, ok, ?CONFIGURED, State};
         {error, _Reason}=Err ->
@@ -196,11 +197,11 @@ init_sf_mappings(MaxRetries) ->
 
         Url = restc:construct_url(binary_to_list(ApiEndpoint), binary_to_list(ApiVersionPath), []),
 
-        Response <- sf_client_lib:request(get, 200, Url),
+        Response <- sf_client_lib:request(get, 200, Url, true, false),
         SObjectsPath <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"sobjects">>, Response),
                                                      error_m, no_name_attribute_found),
         SObjectsUrl = restc:construct_url(binary_to_list(ApiEndpoint), binary_to_list(SObjectsPath), []),
-        SObjectsResponse <- sf_client_lib:request(get, 200, SObjectsUrl),
+        SObjectsResponse <- sf_client_lib:request(get, 200, SObjectsUrl, true, false),
         SObjects <- sf_client_lib:undefined_lift(st_traverse_utils:traverse_by_path(<<"sobjects">>, SObjectsResponse),
                                                  error_m, no_sobjects_attribute_found),
         ProcessedSObjectsMapping <- lists:foldl(fun(SObject, {ok, Acc}) ->
@@ -233,6 +234,6 @@ init_sf_mappings(MaxRetries) ->
             error_m:return(ok);
         {error, Reason} ->
             _ = lager:error("Unable to initialize sobjects mapping; Reason: ~p", [Reason]),
-            timer:sleep(2000),
+            timer:sleep(?REQUEST_RETRY_TIMEOUT),
             init_sf_mappings(MaxRetries - 1)
     end.

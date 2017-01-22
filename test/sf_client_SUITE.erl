@@ -17,6 +17,7 @@
      all/0
     ,init_per_testcase/2
     ,end_per_testcase/2
+    ,end_per_suite/1
     ,proper_integration_test/1
     ,credentials_changed/1
 ]).
@@ -26,10 +27,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-%%all() -> [].
-%%all() -> [proper_integration_test, credentials_changed].
-all() -> [proper_integration_test].
-%%all() -> [credentials_changed].
+all() -> [proper_integration_test, credentials_changed].
 
 
 init_per_testcase(_TestCase, Config) ->
@@ -38,6 +36,11 @@ init_per_testcase(_TestCase, Config) ->
 
 
 end_per_testcase(_TestCase, Config) ->
+    sf_client_config_eunit_lib:teardown(Config).
+
+
+end_per_suite(Config) ->
+    sf_client_config_eunit_lib:unset_config_env(),
     sf_client_config_eunit_lib:teardown(Config).
 
 
@@ -64,25 +67,43 @@ integration_test() ->
 
 
 credentials_changed(_Config) ->
-    Model1 = <<>>,
-    Model2 = <<>>,
+    ModelType = ?SUCHTHAT({Model1, Model2}, {any(), any()}, Model1 /= Model2),
+    PrintableString = non_empty(list(range($ , $~))),
+    CredentialsChangedProp =
+    ?FORALL({{Model1, Model2}, AccessToken, ClientId, ClientSecret, Username, Password},
+            {ModelType, PrintableString, PrintableString, PrintableString, PrintableString, PrintableString},
 
-    InternalModelId = make_ref(),
-    {ok, _ID} = sf_client:create(?MAPPING_KEY, {InternalModelId, Model1}),
+        ?WHENFAIL(ct:pal("credentials_changed test failes with the following data:~n~p~n",
+                         [{{Model1, Model2}, AccessToken, ClientId, ClientSecret, Username, Password}]),
+            begin
+                sf_client_sobjects_mapping_server:reinitialize_sf_mapping(),
+                InternalModelId = make_ref(),
+                {ok, _ID} = sf_client:create(?MAPPING_KEY, {InternalModelId, Model1}),
 
-    meck:expect(restc, request, fun
-        (post, json, "https://localhost/services/oauth2/token?grant_type=" ++ _, [200], [], []) ->
-            ?RESTC_ERR_RESPONSE(401, [], #{
-                <<"error">> => <<"invalid_grant">>
-            });
+                meck:expect(restc, request, fun
+                    (post, json, "https://localhost/services/oauth2/token?grant_type=" ++ _, [200], [], []) ->
+                        ?RESTC_ERR_RESPONSE(401, [], #{
+                            <<"error">> => <<"invalid_grant">>
+                        });
 
-        %% Create a new resource => sf_client:create...
-        (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
-            [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], _DbModel) ->
-            ?RESTC_ERR_RESPONSE(401, [], #{
-                <<"error">> => <<"invalid_grant">>
-            })
-    end),
+                    %% Create a new resource => sf_client:create...
+                    (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
+                        [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], _DbModel) ->
+                        ?RESTC_ERR_RESPONSE(401, [], #{
+                            <<"error">> => <<"invalid_grant">>
+                        })
+                end),
 
-    InternalModel2Id = make_ref(),
-    {error, max_retries} = sf_client:create(?MAPPING_KEY, {InternalModel2Id, Model2}).
+                InternalModel2Id = make_ref(),
+                {error, not_authorized} = sf_client:create(?MAPPING_KEY, {InternalModel2Id, Model2}),
+
+                sf_client_config_eunit_lib:mock_access_token_request_success(list_to_binary(AccessToken), ClientId,
+                                                                             ClientSecret, Username, Password),
+                sf_client_config_eunit_lib:update_config_env(ClientId, ClientSecret, Username, Password,
+                                                             sf_client_config:get_access_token_expiry()),
+                ok = sf_client:reinitialize_client(),
+                {ok, _Id2} = sf_client:create(?MAPPING_KEY, {InternalModel2Id, Model2}),
+                true
+            end)),
+
+    ?assert(proper:quickcheck(CredentialsChangedProp, [{numtests, 1}, noshrink])).

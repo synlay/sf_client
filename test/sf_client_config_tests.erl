@@ -35,7 +35,7 @@ sf_client_config_sf_rest_api_test(_) ->
         {Protocol, Domain} = UrlParts,
         string:concat(Protocol, Domain)
     end),
-    PrintableString = non_empty(list(range(1,255))),
+    PrintableString = non_empty(list(range($ , $~))),
 
     Property = ?FORALL(String, PrintableString,
     begin
@@ -69,11 +69,7 @@ sf_client_config_sf_rest_api_test(_) ->
     CredentialProperty = ?FORALL({ClientId, ClientSecret, Username, Password, AccessTokenExpiry},
                                  {PrintableString, PrintableString, PrintableString, PrintableString, pos_integer()},
         begin
-            true = os:putenv("SF_CREDENTIALS_CLIENT_ID", ClientId),
-            true = os:putenv("SF_CREDENTIALS_CLIENT_SECRET", ClientSecret),
-            true = os:putenv("SF_CREDENTIALS_USERNAME", Username),
-            true = os:putenv("SF_CREDENTIALS_PASSWORD", Password),
-            true = os:putenv("SF_ACCESS_TOKEN_EXPIRY", integer_to_list(AccessTokenExpiry)),
+            sf_client_config_eunit_lib:update_config_env(ClientId, ClientSecret, Username, Password, AccessTokenExpiry),
             sf_client_config:init(),
             ClientId == sf_client_config:get_credentials_client_id() andalso
             ClientSecret == sf_client_config:get_credentials_client_secret() andalso
@@ -116,8 +112,6 @@ sf_client_config_sf_rest_api_test(_) ->
             ?_assertEqual("password", sf_client_config:get_credentials_password())}
         ,{"Configuration for access_token_expiry from app.config should match",
             ?_assertEqual(3600, sf_client_config:get_access_token_expiry())}
-        ,{"Configuration for access_token_server_request_retry_timeout from app.config should match",
-            ?_assertEqual(6300, sf_client_config:get_access_token_server_request_retry_timeout())}
         ,?_assert(proper:quickcheck(CredentialProperty, [{to_file, user}]))
         ,{"Configuration for sobjects_mapping from app.config should match",
             ?_assertEqual(#{}, begin ok = meck:unload(sf_client_config), sf_client_config:get_sobjects_mapping() end )}
@@ -149,8 +143,6 @@ sf_client_config_unset_test(_) ->
             ?_assertError({missing_config, sf_credentials_password}, sf_client_config:get_credentials_password())}
         ,{"Missing configuration for sf_access_token_expiry should throw an error",
             ?_assertError({missing_config, sf_access_token_expiry}, sf_client_config:get_access_token_expiry())}
-        ,{"Missing configuration for access_token_server_request_retry_timeout should throw an error",
-            ?_assertError({missing_config, access_token_server_request_retry_timeout}, sf_client_config:get_access_token_server_request_retry_timeout())}
         ,{"Missing configuration for sobjects_mapping should throw an error",
             ?_assertError({missing_config, sobjects_mapping}, begin ok = meck:unload(sf_client_config), sf_client_config:get_sobjects_mapping() end)}
     ]}.

@@ -14,6 +14,7 @@
 -define(ACCESS_TOKEN_ASSIGNED,   access_token_assigned).
 -define(ACCESS_TOKEN_UNASSIGNED, access_token_unassigned).
 -define(MAX_RECONNECT_ATTEMPTS,  3).
+-define(REQUEST_RETRY_TIMEOUT, 2000).
 
 -type get_server_access_token_queue() :: queue:queue({pid(), term()}).
 -type access_token() :: binary().
@@ -59,7 +60,7 @@
     Reason           :: term().
 get_server_access_token() ->
     case catch gen_fsm:sync_send_event(?MODULE, get_server_access_token,
-             sf_client_config:get_access_token_server_request_retry_timeout() * (?MAX_RECONNECT_ATTEMPTS + 1) * 1000) of
+                                       ?REQUEST_RETRY_TIMEOUT * (?MAX_RECONNECT_ATTEMPTS + 1)) of
         {'EXIT', {timeout, _}} ->
             {error, 'timeout_while_trying_to_communicate_with_auth_server'};
         Other ->
@@ -146,7 +147,7 @@ init([]) ->
             {next_state, ?ACCESS_TOKEN_UNASSIGNED, State#state{
                 max_reconnect_attempts = State#state.max_reconnect_attempts - 1,
                 attempt_error_msg = Reason
-            }, 2000}
+            }, ?REQUEST_RETRY_TIMEOUT}
     end;
 
 ?ACCESS_TOKEN_UNASSIGNED(timeout, State) ->
@@ -301,7 +302,7 @@ init_system() ->
         {"username", sf_client_config:get_credentials_username()},
         {"password", sf_client_config:get_credentials_password()}
     ]),
-    case sf_client_lib:request([], post, 200, Url, false) of
+    case sf_client_lib:request([], post, 200, Url, false, false) of
         {ok, Body} ->
             _ = lager:debug("Got new access token from SalesForce"),
             {ok, st_traverse_utils:traverse_by_path(<<"access_token">>, Body),

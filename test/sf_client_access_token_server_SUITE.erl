@@ -15,11 +15,10 @@
      all/0
     ,init_per_testcase/2
     ,end_per_testcase/2
-%%    ,init_per_suite/1
-%%    ,end_per_suite/1
     ,integration_test/1
     ,token_expired/1
     ,invalid_credentials/1
+    ,timeout_while_trying_to_communicate_with_auth_server/1
     ,white_box_testing/1
 ]).
 
@@ -28,14 +27,22 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-all() -> [integration_test, token_expired, invalid_credentials, white_box_testing].
+all() -> [integration_test, token_expired, invalid_credentials, timeout_while_trying_to_communicate_with_auth_server, white_box_testing].
 
+
+init_per_testcase(timeout_while_trying_to_communicate_with_auth_server, Config) ->
+    ok = meck:new(sf_client_lib, [passthrough]),
+    init_per_testcase(other, Config);
 
 init_per_testcase(_TestCase, Config) ->
     AccessToken = term_to_binary(make_ref()),
     ok = sf_client_config_eunit_lib:setup(AccessToken),
     [{access_token, AccessToken} | Config].
 
+
+end_per_testcase(timeout_while_trying_to_communicate_with_auth_server, Config) ->
+    meck:unload(sf_client_lib),
+    end_per_testcase(default, Config);
 
 end_per_testcase(_TestCase, Config) ->
     sf_client_config_eunit_lib:teardown(Config).
@@ -74,10 +81,20 @@ invalid_credentials(Config) ->
             })
     end),
     ok = sf_client_access_token_server:reasign_server_access_token(),
-    {error, max_retries} = sf_client_access_token_server:get_server_access_token(),
-    meck:expect(sf_client_config, get_access_token_server_request_retry_timeout, fun() -> 0 end),
+    {error, not_authorized} = sf_client_access_token_server:get_server_access_token().
+
+
+timeout_while_trying_to_communicate_with_auth_server(_Config) ->
+    meck:expect(sf_client_lib, request, fun([], post, 200, _Url, false, false) ->
+        Ref = make_ref(),
+        receive
+            Ref -> ok %% blocking as Ref can never be received
+        end
+    end),
+    ok = sf_client_access_token_server:reasign_server_access_token(),
     {error, timeout_while_trying_to_communicate_with_auth_server} =
                                                                 sf_client_access_token_server:get_server_access_token().
+
 
 white_box_testing(_Config) ->
     Event = make_ref(),

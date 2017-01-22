@@ -25,7 +25,6 @@
     ,get_credentials_username/0
     ,get_credentials_password/0
     ,get_access_token_expiry/0
-    ,get_access_token_server_request_retry_timeout/0
     ,get_sobjects_mapping/0
 ]).
 
@@ -50,7 +49,7 @@ init() ->
           end}, {default, fun() ->
               RestApiEndpoint = get_sf_rest_api_endpoint(),
               ServiceDataUrl = restc:construct_url(binary_to_list(RestApiEndpoint), "/services/data/", []),
-              case sf_client_lib:request([], get, 200, ServiceDataUrl, false) of
+              case sf_client_lib:request([], get, 200, ServiceDataUrl, false, false) of
                   {ok, Body} ->
                       VersionPath = find_iterator(get_sf_rest_api_version(), Body),
                       _ = lager:debug("Found a SalesForce REST API version path: ~s", [VersionPath]),
@@ -121,11 +120,6 @@ get_credentials_password() ->
 -spec get_access_token_expiry() -> pos_integer().
 get_access_token_expiry() ->
     stillir:get_config(?APP_ENV, sf_access_token_expiry).
-
-
--spec get_access_token_server_request_retry_timeout() -> pos_integer().
-get_access_token_server_request_retry_timeout() ->
-    get_config(access_token_server_request_retry_timeout).
 
 
 -spec get_sobjects_mapping() -> sobjects_mapping().
