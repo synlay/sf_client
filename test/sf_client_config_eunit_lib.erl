@@ -36,7 +36,9 @@
     ,unset_config_env/0
     ,update_config_env/5
     ,mock_access_token_request_success/1
+    ,mock_access_token_request_success/3
     ,mock_access_token_request_success/5
+    ,mock_access_token_request_success/7
 ]).
 
 
@@ -60,7 +62,40 @@ mock_access_token_request_success(AccessToken) ->
     mock_access_token_request_success(AccessToken, "client_id", "client_secret", "username", "password").
 
 
+mock_access_token_request_success(AccessToken, CreateResourceResultFun, FindModelResultFun) ->
+    mock_access_token_request_success(AccessToken, "client_id", "client_secret", "username", "password",
+                                      CreateResourceResultFun, FindModelResultFun).
+
+
 mock_access_token_request_success(AccessToken, ClientId, ClientSecret, Username, Password) ->
+    FindModelResultFun = fun(IdWithSufix) ->
+        [ExternalId, _Suffix] = binary:split(list_to_binary(IdWithSufix), <<"?fields=Id">>),
+
+        case ets:match(?MODULE, {'$1', '_', ExternalId}) of
+            [] ->
+                {error, not_found};
+            [[SfInternalId]] ->
+                ?RESTC_RESPONSE(200, [], #{<<"Id">> => SfInternalId})
+        end
+    end,
+    CreateResourceResultFun = fun(DbModel) ->
+        SfInternalId = get_sf_id(DbModel),
+        ExternalId = proplists:get_value(sobject_external_id_attribute_name(), DbModel),
+        true = ets:insert(?MODULE, {SfInternalId, DbModel, ExternalId}),
+
+        ?RESTC_RESPONSE(201, [], #{
+             <<"id">> => SfInternalId
+            ,<<"success">> => true
+            ,<<"errors">> => []
+        })
+    end,
+    mock_access_token_request_success(AccessToken, ClientId, ClientSecret, Username, Password, CreateResourceResultFun,
+                                      FindModelResultFun).
+
+
+mock_access_token_request_success(AccessToken, ClientId, ClientSecret, Username, Password, CreateResourceResultFun,
+                                  FindModelResultFun) ->
+
     timer:sleep(100),
 
     Url = restc:construct_url("https://localhost", "/services/oauth2/token", [
@@ -125,16 +160,7 @@ mock_access_token_request_success(AccessToken, ClientId, ClientSecret, Username,
         (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
                                                                            [{<<"Authorization">>, Token}], DbModel) when
                                                                                            Token == AccessTokenHeader ->
-
-            SfInternalId = get_sf_id(DbModel),
-            ExternalId = proplists:get_value(sobject_external_id_attribute_name(), DbModel),
-            true = ets:insert(?MODULE, {SfInternalId, DbModel, ExternalId}),
-
-            ?RESTC_RESPONSE(201, [], #{
-                 <<"id">> => SfInternalId
-                ,<<"success">> => true
-                ,<<"errors">> => []
-            });
+            CreateResourceResultFun(DbModel);
 
         (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
                                                                     [{<<"Authorization">>, _InvalidGrant}], _DbModel) ->
@@ -145,15 +171,7 @@ mock_access_token_request_success(AccessToken, ClientId, ClientSecret, Username,
                 "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/External_ID__c/" ++ IdWithSufix,
                                                                          [200], [{<<"Authorization">>, Token}], []) when
                                                                                            Token == AccessTokenHeader ->
-
-            [ExternalId, _Suffix] = binary:split(list_to_binary(IdWithSufix), <<"?fields=Id">>),
-
-            case ets:match(?MODULE, {'$1', '_', ExternalId}) of
-                [] ->
-                    {error, not_found};
-                [[SfInternalId]] ->
-                    ?RESTC_RESPONSE(200, [], #{<<"Id">> => SfInternalId})
-            end;
+            FindModelResultFun(IdWithSufix);
 
         (get, json, "https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name/External_ID__c/" ++ _,
                                                                    [200], [{<<"Authorization">>, _InvalidGrant}], []) ->

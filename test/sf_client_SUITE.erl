@@ -10,6 +10,7 @@
 -author("David Robakowski").
 
 -define(MAPPING_KEY, sf_client_config_eunit_lib).
+-define(RESTC_RESPONSE(ExpectedStatusCode, Header, Body), {ok, ExpectedStatusCode, Header, Body}).
 -define(RESTC_ERR_RESPONSE(ExpectedStatusCode, Header, Body), {error, ExpectedStatusCode, Header, Body}).
 
 
@@ -20,6 +21,7 @@
     ,end_per_suite/1
     ,proper_integration_test/1
     ,credentials_changed/1
+    ,no_id_attribute_found/1
 ]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -27,7 +29,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-all() -> [proper_integration_test, credentials_changed].
+all() -> [no_id_attribute_found, proper_integration_test, credentials_changed].
 
 
 init_per_testcase(_TestCase, Config) ->
@@ -107,3 +109,20 @@ credentials_changed(_Config) ->
             end)),
 
     ?assert(proper:quickcheck(CredentialsChangedProp, [{numtests, 1}, noshrink])).
+
+
+no_id_attribute_found(_) ->
+    FindModelResultFun = fun(_IdWithSufix) ->
+        ?RESTC_RESPONSE(200, [], #{<<"other_data_field">> => <<"NBDJ3847JNO">>})
+    end,
+    CreateResourceResultFun = fun(_) ->
+        ?RESTC_RESPONSE(201, [], #{
+             <<"other_data_field">> => <<"NBDJ3847JNO">>
+            ,<<"success">> => true
+            ,<<"errors">> => []
+        })
+    end,
+    sf_client_config_eunit_lib:mock_access_token_request_success(<<"ACCESS_TOKEN">>, CreateResourceResultFun,
+                                                                 FindModelResultFun),
+    {error, no_id_attribute_found} = sf_client:create(?MAPPING_KEY, {<<>>, <<>>}),
+    {error, no_id_attribute_found} = sf_client:get_sobject_id_by_model(?MAPPING_KEY, {<<>>, <<>>}).
