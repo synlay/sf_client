@@ -21,6 +21,8 @@
     ,end_per_suite/1
     ,proper_integration_test/1
     ,credentials_changed/1
+    ,service_unavailable_request_errors/1
+    ,unkown_request_errors/1
     ,no_id_attribute_found/1
 ]).
 
@@ -29,7 +31,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-all() -> [no_id_attribute_found, proper_integration_test, credentials_changed].
+all() -> [no_id_attribute_found, service_unavailable_request_errors, unkown_request_errors, proper_integration_test, credentials_changed].
 
 
 init_per_testcase(_TestCase, Config) ->
@@ -90,7 +92,7 @@ credentials_changed(_Config) ->
 
                     %% Create a new resource => sf_client:create...
                     (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
-                        [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], _DbModel) ->
+                                                         [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], _DbModel) ->
                         ?RESTC_ERR_RESPONSE(401, [], #{
                             <<"error">> => <<"invalid_grant">>
                         })
@@ -105,6 +107,60 @@ credentials_changed(_Config) ->
                                                              sf_client_config:get_access_token_expiry()),
                 ok = sf_client:reinitialize_client(),
                 {ok, _Id2} = sf_client:create(?MAPPING_KEY, {InternalModel2Id, Model2}),
+                true
+            end)),
+
+    ?assert(proper:quickcheck(CredentialsChangedProp, [{numtests, 1}, noshrink])).
+
+
+service_unavailable_request_errors(_Config) ->
+    PrintableString = non_empty(list(range($ , $~))),
+    CredentialsChangedProp =
+    ?FORALL({Model, AccessToken, ClientId, ClientSecret, Username, Password},
+            {any(), PrintableString, PrintableString, PrintableString, PrintableString, PrintableString},
+
+        ?WHENFAIL(ct:pal("service_unavailable_request_errors test failes with the following data:~n~p~n",
+                         [{Model, AccessToken, ClientId, ClientSecret, Username, Password}]),
+            begin
+                sf_client_sobjects_mapping_server:reinitialize_sf_mapping(),
+                InternalModelId = make_ref(),
+
+                meck:expect(restc, request, fun
+                    %% Create a new resource => sf_client:create...
+                    (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
+                                                         [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], _DbModel) ->
+                        ?RESTC_ERR_RESPONSE(503, [], #{
+                            <<"error">> => <<"Service Unavailable">>
+                        })
+                end),
+                MatchError = #{<<"error">> => <<"Service Unavailable">>},
+                {error, MatchError} = sf_client:create(?MAPPING_KEY, {InternalModelId, Model}),
+                true
+            end)),
+
+    ?assert(proper:quickcheck(CredentialsChangedProp, [{numtests, 1}, noshrink])).
+
+
+unkown_request_errors(_Config) ->
+    PrintableString = non_empty(list(range($ , $~))),
+    CredentialsChangedProp =
+    ?FORALL({Model, AccessToken, ClientId, ClientSecret, Username, Password},
+            {any(), PrintableString, PrintableString, PrintableString, PrintableString, PrintableString},
+
+        ?WHENFAIL(ct:pal("unkown_request_errors test failes with the following data:~n~p~n",
+                         [{Model, AccessToken, ClientId, ClientSecret, Username, Password}]),
+            begin
+                sf_client_sobjects_mapping_server:reinitialize_sf_mapping(),
+                InternalModelId = make_ref(),
+
+                meck:expect(restc, request, fun
+                    %% Create a new resource => sf_client:create...
+                    (post, json, <<"https://localhost/services/data/v39.0/sobjects/MOCK_sobject_table_name">>, [201],
+                                                         [{<<"Authorization">>,<<"Bearer ACCESS_TOKEN">>}], _DbModel) ->
+                        {error, <<"Unkown error">>}
+
+                end),
+                {error, <<"Unkown error">>} = sf_client:create(?MAPPING_KEY, {InternalModelId, Model}),
                 true
             end)),
 

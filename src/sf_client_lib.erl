@@ -32,7 +32,7 @@ request(DbModel, Action, ExpectedStatusCode, Url) ->
     request(DbModel, Action, ExpectedStatusCode, Url, true, true).
 
 request(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest) ->
-    request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, 5).
+    request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, 3, undefined).
 
 
 undefined_lift(undefined, Monad, Message) -> Monad:fail(Message);
@@ -60,8 +60,9 @@ get_access_token_helper() ->
     end.
 
 
-request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, Retries) when not RetryRequest orelse
-                                                                                              Retries > 0 ->
+request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, Retries, _ErrAcc) when not RetryRequest
+                                                                                                   orelse Retries > 0 ->
+    Return =
     do([error_m ||
         Auth <- if
             UseAuth ->
@@ -73,14 +74,7 @@ request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, 
             {ok, ExpectedStatusCode, _Header, Body} ->
                 error_m:return(Body);
             {error, 401, _Header, _Body} ->
-                if
-                    RetryRequest ->
-                        _ = sf_client_access_token_server:reasign_server_access_token(),
-                        ok = random_timeout(Retries, "Token seems to be unauthorized or expired", []),
-                        request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, Retries - 1);
-                    true ->
-                        error_m:fail(not_authorized)
-                end;
+                error_m:fail(not_authorized);
             {error, _Reason}=Err ->
                 Err;
             {error, _Code, _Header, Body} ->
@@ -91,8 +85,26 @@ request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, 
                         error_m:fail(Body)
                 end
         end
-    ]);
+    ]),
+    case Return of
+        {error, Reason}=Err ->
+            if
+                RetryRequest andalso Reason == not_authorized ->
+                    _ = sf_client_access_token_server:reasign_server_access_token(),
+                    ok = random_timeout(Retries, "Token seems to be unauthorized or expired", []),
+                    request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, Retries - 1, Reason);
 
-request_helper(_DbModel, Action, _ExpectedStatusCode, Url, _UseAuth, _RetryRequest, _Retries) ->
-    _ = lager:error("Maximal retries reached for '~p' request to URL: '~p'", [Action, Url]),
-    error_m:fail(max_retries).
+                RetryRequest ->
+                    request_helper(DbModel, Action, ExpectedStatusCode, Url, UseAuth, RetryRequest, Retries - 1, Reason);
+
+                true ->
+                    Err
+            end;
+
+        OkTuple ->
+            OkTuple
+    end;
+
+request_helper(_DbModel, _Action, _ExpectedStatusCode, _Url, _UseAuth, _RetryRequest, _Retries, ErrAcc) ->
+    _ = lager:error("Maximal retries reached for trying to execute request"),
+    error_m:fail(ErrAcc).
