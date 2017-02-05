@@ -1,9 +1,7 @@
-[![Travis][travis badge]][travis]
+[![Build Status](https://travis-ci.org/synlay/sf_client.svg?branch=develop)](https://travis-ci.org/synlay/sf_client) 
 [![Coverage Status](https://coveralls.io/repos/github/synlay/sf_client/badge.svg?branch=develop)](https://coveralls.io/github/synlay/sf_client?branch=develop)
-[![Hex.pm Version][hex version badge]][hex]
-[![Hex.pm License][hex license badge]][hex]
-[![Erlang Versions][erlang version badge]][travis]
-[![Build Tool][build tool]][hex]
+[![Hex.pm](https://img.shields.io/hexpm/v/sf_client.svg)](https://hex.pm/packages/sf_client) 
+[![GitHub license](https://img.shields.io/github/license/synlay/sf_client.svg)](https://github.com/synlay/sf_client)
 
 sf_client
 =====
