@@ -1,8 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @author David Robakowski
-%%% @copyright (C) 2016, Synlay Technologies UG & Co. KG
+%%% @copyright (C) 2016, David Robakowski & Synlay Technologies UG & Co. KG
 %%% @doc
-%%%
+%%% Salesforce REST API client for Erlang
 %%% @end
 %%% Created : 11. Aug 2016 18:55
 %%%-------------------------------------------------------------------
@@ -30,7 +30,11 @@
     ,sf_sobject_id/0
 ]).
 
-
+%% @doc Reinitialize the client.
+%%
+%% Reinitializes the client by reseting the configuration environment, get new credentials and reinitialize the intern
+%% route mappings to the Salefoce endpoint. Returns `ok'.
+-spec reinitialize_client() -> ok.
 reinitialize_client() ->
     _ = sf_client_config:init(),
     _ = sf_client_access_token_server:reasign_server_access_token(),
@@ -38,6 +42,10 @@ reinitialize_client() ->
     ok.
 
 
+%% @doc Creates a new `sObject'.
+%%
+%% Creates a new `sObject' for the data model `Model' using the concrete behaviour which is associated with
+%% the model type `MappingKey'. Returns the created `sObject' ID if successful, otherwise an error.
 -spec create(MappingKey :: mapping_key(), Model :: model()) -> {ok, Id :: sf_sobject_id()} | {error, Reason :: any()}.
 create(MappingKey, Model) ->
     do([error_m ||
@@ -51,6 +59,10 @@ create(MappingKey, Model) ->
     ]).
 
 
+%% @doc Updates an existing `sObject'.
+%%
+%% Updates an existing `sObject' with the id `SObjectId' using the data model `Model', which is associated through
+%% the model type `MappingKey'. Returns `ok' if successful, otherwise an error.
 -spec update(MappingKey :: mapping_key(), SObjectId :: sf_sobject_id(), Model :: model()) -> ok | {error, Reason :: any()}.
 update(MappingKey, SObjectId, Model) ->
     do([error_m ||
@@ -62,6 +74,10 @@ update(MappingKey, SObjectId, Model) ->
     ]).
 
 
+%% @doc Deletes an existing `sObject'.
+%%
+%% Deletes an existing `sObject' associated with the Saleforce ID `SObjectId' and model type `MappingKey'. Returns `ok'
+%% if successful, otherwise an error.
 -spec delete(MappingKey :: mapping_key(), SObjectId :: sf_sobject_id()) -> ok | {error, Reason :: any()}.
 delete(MappingKey, SObjectId) ->
     do([error_m ||
@@ -72,6 +88,10 @@ delete(MappingKey, SObjectId) ->
     ]).
 
 
+%% @doc Finds the `sObject' ID.
+%%
+%% Finds the `sObject' ID over the model `Model' which is associated with the model type `MappingKey'.
+%% Returns the `sObject' ID if the `sObject' could be found, otherwise an error.
 -spec get_sobject_id_by_model(MappingKey :: mapping_key(), Model :: model()) -> {ok, SObjectId :: sf_sobject_id()} | {error, Reason :: any()}.
 get_sobject_id_by_model(MappingKey, Model) ->
     do([error_m ||
