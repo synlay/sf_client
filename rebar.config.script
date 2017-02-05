@@ -6,9 +6,9 @@ MaybeUpdatedConfig = case erlang:function_exported(rebar3, main, 1) of
         %% profiles
         [{deps, [
              {lager,       ".*", {git, "https://github.com/basho/lager.git", {tag, "3.2.1"}}}
-            ,{restc,       ".*", {git, "https://github.com/synlay/restclient.git", "fdaf3d112f0e028a2702b3f3ed6ef327e6c0b410"}}
+            ,{restc,       ".*", {git, "https://github.com/synlay/restclient.git", "56ceecd9e45df3619f3cf669de99104ac54ca081"}}
             ,{stillir,     ".*", {git, "https://github.com/heroku/stillir.git", {tag, "1.0.0"}}}
-            ,{st_commons,  ".*", {git, "https://github.com/synlay/st_commons.git", {branch, "develop"}}}
+            ,{st_commons,  ".*", {git, "https://github.com/synlay/st_commons.git", {tag, "1.2.1"}}}
             ,{erlando,     ".*", {git, "https://github.com/rabbitmq/erlando.git", "1c1ef25a9bc228671b32b4a6ee30c7525314b1fd"}}
             ,{parse_trans, ".*", {git, "https://github.com/uwiger/parse_trans.git", {tag, "3.0.0"}}}
         ]} | [Config || {Key, _Value}=Config <- CONFIG, Key =/= deps andalso Key =/= plugins]]
