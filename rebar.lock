@@ -14,10 +14,7 @@
  {<<"mimerl">>,{pkg,<<"mimerl">>,<<"1.0.2">>},2},
  {<<"mochiweb_util">>,{pkg,<<"mochiweb_util">>,<<"0.1.0">>},1},
  {<<"parse_trans">>,{pkg,<<"parse_trans">>,<<"3.0.0">>},0},
- {<<"restc">>,
-  {git,"https://github.com/synlay/restclient.git",
-       {ref,"3ccbdbfa67ebd65ae1cf70b8dc00bc6c745d49cf"}},
-  0},
+ {<<"restc">>,{pkg,<<"restc">>,<<"0.3.8">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.1">>},2},
  {<<"st_commons">>,{pkg,<<"st_commons">>,<<"1.2.1">>},0},
  {<<"stillir">>,{pkg,<<"stillir">>,<<"1.0.0">>},0}]}.
@@ -34,6 +31,7 @@
  {<<"mimerl">>, <<"993F9B0E084083405ED8252B99460C4F0563E41729AB42D9074FD5E52439BE88">>},
  {<<"mochiweb_util">>, <<"ECD20D44C6A8E19D1D6E5FE6921E55E921DA6E42F8757A00FF901C7AD4DC5D3D">>},
  {<<"parse_trans">>, <<"9E96B1C9C3A0DF54E7B76F8F685D38BFA1EB21B31E042B1D1A5A70258E4DB1E3">>},
+ {<<"restc">>, <<"26B8487CC0836E364579D899448E5DCB42BDF3293C6DBD0452A27C4462E8A5A5">>},
  {<<"ssl_verify_fun">>, <<"28A4D65B7F59893BC2C7DE786DEC1E1555BD742D336043FE644AE956C3497FBE">>},
  {<<"st_commons">>, <<"D43E8A6F38884B0E8FB439723E281F4F9BFFA1FD88E1A4293AD753B138429750">>},
  {<<"stillir">>, <<"9E77EAADD2418A61EC7398C01E29DEA26D14F51C42E0B309084493E3ED33337A">>}]}
